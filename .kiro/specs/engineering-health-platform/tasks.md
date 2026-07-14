@@ -6,15 +6,15 @@ This plan implements the Engineering Health & Delivery Governance Platform as a 
 
 ## Tasks
 
-- [ ] 1. Initialize Git repository
-  - [-] 1.1 Initialize git repo and create initial commit
+- [x] 1. Initialize Git repository
+  - [x] 1.1 Initialize git repo and create initial commit
     - Run `git init` in the project root
     - Create `.gitignore` with entries for: node_modules/, dist/, *.sqlite, *.sqlite3, .env, coverage/, .DS_Store
     - Run `git add .gitignore` and `git commit -m "chore: initialize repository with .gitignore"`
     - _Requirements: 7.1_
 
 - [ ] 2. Set up project structure and core interfaces
-  - [~] 2.1 Initialize monorepo with /client and /server directories
+  - [x] 2.1 Initialize monorepo with /client and /server directories
     - Create `/server/package.json` with dependencies: express, better-sqlite3, multer, zod, jsonwebtoken, xlsx, uuid, cors
     - Create `/server/tsconfig.json` with `strict: true`
     - Create `/client/package.json` with dependencies: react, react-dom, react-router-dom, axios, ag-grid-react, recharts
@@ -22,19 +22,19 @@ This plan implements the Engineering Health & Delivery Governance Platform as a 
     - Create top-level README.md with project overview and run instructions
     - _Requirements: 7.1, 7.5, 7.7_
 
-  - [~] 2.2 Define shared TypeScript types and interfaces
+  - [-] 2.2 Define shared TypeScript types and interfaces
     - Create `/server/src/types/index.ts` with all domain interfaces: SprintDataRow, KpiComputedResult, TeamConfig, UploadRecord, KpiName, RagStatus, KpiResult, KpiFilter, ThresholdConfig, DecodedToken
     - Create `/server/src/types/api.ts` with API request/response types: UploadResult, ValidationError
     - Create `/client/src/types/index.ts` with client-side type definitions matching API contracts
     - _Requirements: 7.5_
 
-  - [~] 2.3 Create Zod validation schemas
+  - [-] 2.3 Create Zod validation schemas
     - Create `/server/src/schemas/excel-row.schema.ts` with the `excelRowSchema` for all 22 columns including date format validation, JIRA ID pattern, numeric ranges, and Y/N enums
     - Create `/server/src/schemas/kpi-filter.schema.ts` with the `kpiFilterSchema`
     - Create `/server/src/schemas/threshold.schema.ts` with the `thresholdUpdateSchema`
     - _Requirements: 7.4, 1.4_
 
-  - [~] 2.4 Set up Vitest and fast-check testing infrastructure
+  - [x] 2.4 Set up Vitest and fast-check testing infrastructure
     - Add vitest and fast-check as dev dependencies in `/server/package.json`
     - Create `/server/vitest.config.ts` with test configuration
     - Add @testing-library/react, jsdom, vitest to `/client/package.json` dev dependencies
@@ -42,23 +42,23 @@ This plan implements the Engineering Health & Delivery Governance Platform as a 
     - Create test directory structure: `/server/src/__tests__/properties/`, `/server/src/__tests__/unit/`, `/server/src/__tests__/integration/`
     - _Requirements: 7.5_
 
-- [ ] 3. Implement database schema and migrations
-  - [~] 3.1 Create SQLite database initialization and migration system
+- [x] 3. Implement database schema and migrations
+  - [x] 3.1 Create SQLite database initialization and migration system
     - Create `/server/src/database/connection.ts` exporting a function to initialize better-sqlite3 with WAL mode
     - Create `/server/src/database/migrations/001-initial-schema.ts` with all 7 tables: uploads, sprint_data, kpi_results, team_config, track_portfolio_mapping, rag_thresholds, users
     - Include all indexes: idx_sprint_data_team, idx_sprint_data_portfolio, idx_sprint_data_project, idx_sprint_data_dev_start, idx_sprint_data_jira_team, idx_kpi_results_lookup
     - Create `/server/src/database/migrate.ts` that runs migrations on server startup and terminates with non-zero exit code on failure
     - _Requirements: 7.6, 2.3_
 
-  - [~] 3.2 Create seed data for mock users and default configurations
+  - [x] 3.2 Create seed data for mock users and default configurations
     - Seed `users` table with 4 mock users (one per role: Admin, Engineering_Manager, Delivery_Manager, Leadership) each with pre-generated JWT tokens
     - Seed `track_portfolio_mapping` with 6 default mappings (IBPS-POS, IBPS-Dolphin, IBPS-Claims, mPro, E-Commerce, POSV/IVC)
     - Seed `rag_thresholds` with default thresholds for all 9 KPIs per design specification
     - Create `/server/src/database/seed.ts` that inserts seed data only if tables are empty
     - _Requirements: 6.9, 4.1-4.9_
 
-- [ ] 4. Implement RBAC middleware
-  - [~] 4.1 Create JWT authentication and role-based authorization middleware
+- [x] 4. Implement RBAC middleware
+  - [x] 4.1 Create JWT authentication and role-based authorization middleware
     - Create `/server/src/middleware/rbac.ts` implementing token verification using a local JWT secret
     - Implement `AuthenticatedRequest` extension of Express Request with user context (userId, role)
     - Implement route permission mapping: `/api/upload` → [Admin, Engineering_Manager], `/api/dashboard/*` → all roles, `/api/config/*` → [Admin], `/api/reports/*` → [Engineering_Manager, Delivery_Manager, Leadership], `/api/filters/*` → all roles
@@ -72,15 +72,15 @@ This plan implements the Engineering Health & Delivery Governance Platform as a 
     - Create `/server/src/__tests__/properties/rbac.property.test.ts`
     - **Validates: Requirements 6.1, 6.3, 6.4, 6.10**
 
-- [ ] 5. Implement data persistence layer (Repository Pattern)
-  - [~] 5.1 Create repository interfaces and sprint data repository
+- [x] 5. Implement data persistence layer (Repository Pattern)
+  - [x] 5.1 Create repository interfaces and sprint data repository
     - Create `/server/src/repositories/interfaces.ts` with ISprintDataRepository, IKpiResultsRepository, IConfigRepository interfaces
     - Create `/server/src/repositories/sprint-data.repository.ts` implementing bulkUpsert (with transaction), findByFilter, findByJiraIdAndTeam, countByUpload
     - Implement upsert logic using INSERT OR REPLACE on UNIQUE(jira_id, team) constraint
     - Enforce 10,000 row limit per upload operation
     - _Requirements: 2.1, 2.2, 2.4, 2.5, 2.6, 2.7, 7.2, 7.3_
 
-  - [~] 5.2 Create KPI results and config repositories
+  - [x] 5.2 Create KPI results and config repositories
     - Create `/server/src/repositories/kpi-results.repository.ts` implementing save, saveBatch, findLatest, findTrend
     - Create `/server/src/repositories/config.repository.ts` implementing getThresholds, getThreshold, updateThreshold, getTeamConfig, getAllTeams, upsertTeamConfig, getTrackPortfolioMapping
     - _Requirements: 2.2, 3.13, 7.3_
@@ -96,7 +96,7 @@ This plan implements the Engineering Health & Delivery Governance Platform as a 
 
 - [ ] 6. Checkpoint - Core infrastructure complete
   - Ensure all tests pass, ask the user if questions arise.
-  - [~] 6.1 Commit progress
+  - [-] 6.1 Commit progress
     - Stage all changes: `git add -A`
     - Commit with message: `git commit -m "feat: project scaffolding and database schema"`
     - _Covers tasks 1-5_
