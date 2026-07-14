@@ -249,9 +249,9 @@ This plan implements the Engineering Health & Delivery Governance Platform as a 
     - Use for displaying upload validation errors and any tabular data views
     - _Requirements: 5.10_
 
-- [ ] 13. Checkpoint - Full application assembled
+- [x] 13. Checkpoint - Full application assembled
   - Ensure all tests pass, ask the user if questions arise.
-  - [-] 13.1 Commit progress
+  - [x] 13.1 Commit progress
     - Stage all changes: `git add -A`
     - Commit with message: `git commit -m "feat: API endpoints and dashboard frontend"`
     - _Covers tasks 11-12_
@@ -280,7 +280,7 @@ This plan implements the Engineering Health & Delivery Governance Platform as a 
 
 - [ ] 15. Checkpoint - All tests pass
   - Ensure all tests pass, ask the user if questions arise.
-  - [~] 15.1 Commit progress
+  - [-] 15.1 Commit progress
     - Stage all changes: `git add -A`
     - Commit with message: `git commit -m "test: integration and property-based tests"`
     - _Covers task 14_
