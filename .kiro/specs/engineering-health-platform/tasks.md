@@ -180,42 +180,42 @@ This plan implements the Engineering Health & Delivery Governance Platform as a 
     - Create `/server/src/__tests__/properties/rag-classification.property.test.ts`
     - **Validates: Requirements 4.1-4.10**
 
-- [ ] 10. Checkpoint - Backend business logic complete
+- [x] 10. Checkpoint - Backend business logic complete
   - Ensure all tests pass, ask the user if questions arise.
-  - [-] 10.1 Commit progress
+  - [x] 10.1 Commit progress
     - Stage all changes: `git add -A`
     - Commit with message: `git commit -m "feat: RBAC middleware and data persistence layer"`
     - Then commit upload/KPI/RAG: `git commit --allow-empty -m "feat: upload service, KPI engine, and RAG classification"`
     - Note: If preferred, combine into a single commit covering tasks 4-9: `git add -A && git commit -m "feat: upload service, KPI engine, and RAG classification"`
     - _Covers tasks 4-9_
 
-- [ ] 11. Implement API endpoints and Express server
-  - [~] 11.1 Create Express server setup with middleware stack
+- [x] 11. Implement API endpoints and Express server
+  - [x] 11.1 Create Express server setup with middleware stack
     - Create `/server/src/app.ts` configuring Express with: cors, JSON body parser, multer for file uploads (10 MB limit), RBAC middleware, global error handler
     - Create `/server/src/server.ts` as entry point: run migrations, seed data, start HTTP server
     - Implement global error handler in `/server/src/middleware/error-handler.ts` handling ZodError (400), generic errors (500), with secure error messages
     - _Requirements: 7.6_
 
-  - [~] 11.2 Implement upload and auth API routes
+  - [x] 11.2 Implement upload and auth API routes
     - Create `/server/src/routes/upload.routes.ts` with POST `/api/upload` — accept multipart file, validate format/size/columns/rows, process and return result
     - Create `/server/src/routes/auth.routes.ts` with GET `/api/auth/me` (return current user) and GET `/api/auth/mock-users` (dev-only, list mock tokens)
     - Wire routes to upload service and return appropriate error responses (400 for validation, 401/403 from RBAC)
     - _Requirements: 1.1, 1.6, 1.7, 6.9_
 
-  - [~] 11.3 Implement dashboard and filter API routes
+  - [x] 11.3 Implement dashboard and filter API routes
     - Create `/server/src/routes/dashboard.routes.ts` with GET `/api/dashboard/kpis` (KPI values with RAG and percent change) and GET `/api/dashboard/trends` (6-period trend data)
     - Create `/server/src/routes/filter.routes.ts` with GET `/api/filters/portfolios`, GET `/api/filters/teams`, GET `/api/filters/projects`
     - Accept query parameters for team, portfolio, project, startDate, endDate; validate with kpiFilterSchema
     - _Requirements: 5.1, 5.2, 5.3, 5.4, 5.5, 5.6_
 
-  - [~] 11.4 Implement configuration API routes
+  - [x] 11.4 Implement configuration API routes
     - Create `/server/src/routes/config.routes.ts` with GET `/api/config/thresholds`, PUT `/api/config/thresholds`, GET `/api/config/teams`, PUT `/api/config/teams/:teamName`
     - Validate threshold updates with thresholdUpdateSchema
     - Restrict access to Admin role only
     - _Requirements: 4.1-4.9 (configurable thresholds)_
 
-- [ ] 12. Implement Dashboard frontend
-  - [~] 12.1 Set up React application with routing and theme
+- [x] 12. Implement Dashboard frontend
+  - [x] 12.1 Set up React application with routing and theme
     - Create `/client/src/main.tsx` entry point with React Router
     - Create `/client/src/App.tsx` with route definitions: `/` (Dashboard), `/upload` (Upload page)
     - Create `/client/src/theme/` with Axis Max Life branding: primary Burgundy/Maroon, white backgrounds, light grey secondary, dark grey text
@@ -223,35 +223,35 @@ This plan implements the Engineering Health & Delivery Governance Platform as a 
     - Set up Axios instance with base URL and JWT token injection in Authorization header
     - _Requirements: 5.8, 5.9_
 
-  - [~] 12.2 Implement KPI tiles and RAG badge components
+  - [x] 12.2 Implement KPI tiles and RAG badge components
     - Create `/client/src/components/RagBadge.tsx` — colored dot indicator (green/amber/red)
     - Create `/client/src/components/KpiTile.tsx` — displays KPI name, current value (or "No data available"), RAG badge, percentage change with up/down arrow
     - Create `/client/src/pages/Dashboard.tsx` — renders 9 KPI tiles in responsive 3×3 grid
     - Handle null values and insufficientData flag with appropriate UI indicators
     - _Requirements: 5.1, 5.7, 5.9_
 
-  - [~] 12.3 Implement filter bar and trend charts
+  - [x] 12.3 Implement filter bar and trend charts
     - Create `/client/src/components/FilterBar.tsx` — portfolio dropdown (6 portfolios), team dropdown (filtered by portfolio), date range picker
     - Create `/client/src/components/KpiTrendChart.tsx` using Recharts — line/bar chart showing up to 6 sprint periods per KPI
     - Wire filters to API calls: on filter change, re-fetch KPIs and trends
     - Show minimum 2 data points for trend lines; omit chart rendering if insufficient data
     - _Requirements: 5.2, 5.3, 5.4, 5.5, 5.6, 5.10_
 
-  - [~] 12.4 Implement upload page with drag-and-drop
+  - [x] 12.4 Implement upload page with drag-and-drop
     - Create `/client/src/pages/Upload.tsx` with HTML5 drag-and-drop zone and visual feedback
     - Implement client-side pre-validation: file type (.xlsx/.xls only), file size (≤ 10 MB)
     - Show progress indicator during upload/processing
     - Display success result (row count) or error table (row/field/message) using AG Grid
     - _Requirements: 1.1, 1.6, 1.7, 5.10_
 
-  - [~] 12.5 Implement data table component with AG Grid
+  - [x] 12.5 Implement data table component with AG Grid
     - Create `/client/src/components/DataTable.tsx` wrapping AG Grid with sort, filter, and pagination
     - Use for displaying upload validation errors and any tabular data views
     - _Requirements: 5.10_
 
 - [ ] 13. Checkpoint - Full application assembled
   - Ensure all tests pass, ask the user if questions arise.
-  - [~] 13.1 Commit progress
+  - [-] 13.1 Commit progress
     - Stage all changes: `git add -A`
     - Commit with message: `git commit -m "feat: API endpoints and dashboard frontend"`
     - _Covers tasks 11-12_

@@ -43,6 +43,12 @@ export interface UploadResult {
   timestamp: string;
 }
 
+/** A single data point in a KPI trend chart */
+export interface TrendDataPoint {
+  period: string;
+  value: number;
+}
+
 /** A validation error reported during file upload processing */
 export interface ValidationError {
   row?: number;

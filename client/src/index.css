@@ -1,0 +1,56 @@
+:root {
+  --color-primary: #800020;
+  --color-background: #ffffff;
+  --color-secondary: #f5f5f5;
+  --color-text: #333333;
+  --color-rag-green: #28a745;
+  --color-rag-amber: #ffc107;
+  --color-rag-red: #dc3545;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  background-color: var(--color-background);
+  color: var(--color-text);
+  line-height: 1.6;
+}
+
+h1,
+h2,
+h3 {
+  color: var(--color-primary);
+}
+
+a {
+  color: var(--color-primary);
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+/* Responsive KPI grid — 3 columns desktop, 2 tablet, 1 mobile */
+.kpi-grid {
+  grid-template-columns: repeat(3, 1fr) !important;
+}
+
+@media (max-width: 1024px) {
+  .kpi-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+}
+
+@media (max-width: 640px) {
+  .kpi-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
