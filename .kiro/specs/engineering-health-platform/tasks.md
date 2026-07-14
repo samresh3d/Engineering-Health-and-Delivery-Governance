@@ -94,15 +94,15 @@ This plan implements the Engineering Health & Delivery Governance Platform as a 
     - Create `/server/src/__tests__/properties/persistence.property.test.ts`
     - **Validates: Requirements 1.5, 2.1, 2.4, 2.5, 2.6**
 
-- [ ] 6. Checkpoint - Core infrastructure complete
+- [x] 6. Checkpoint - Core infrastructure complete
   - Ensure all tests pass, ask the user if questions arise.
-  - [-] 6.1 Commit progress
+  - [x] 6.1 Commit progress
     - Stage all changes: `git add -A`
     - Commit with message: `git commit -m "feat: project scaffolding and database schema"`
     - _Covers tasks 1-5_
 
-- [ ] 7. Implement Upload Service
-  - [~] 7.1 Create upload service with file validation and Excel parsing
+- [x] 7. Implement Upload Service
+  - [x] 7.1 Create upload service with file validation and Excel parsing
     - Create `/server/src/services/upload.service.ts` implementing IUploadService interface
     - Implement file format validation: accept only .xlsx/.xls, reject all others with error
     - Implement file size check: reject files > 10 MB before parsing
@@ -111,7 +111,7 @@ This plan implements the Engineering Health & Delivery Governance Platform as a 
     - Parse Excel using xlsx library, map column headers to SprintDataRow fields
     - _Requirements: 1.2, 1.3, 1.6, 1.7, 1.8_
 
-  - [~] 7.2 Implement row-level validation and persistence orchestration
+  - [x] 7.2 Implement row-level validation and persistence orchestration
     - Validate each parsed row against the Zod excelRowSchema
     - Collect up to 100 validation errors with row number and field name
     - On successful validation, call sprint data repository bulkUpsert within a transaction
@@ -126,8 +126,8 @@ This plan implements the Engineering Health & Delivery Governance Platform as a 
     - Create `/server/src/__tests__/properties/row-validation.property.test.ts`
     - **Validates: Requirements 1.2, 1.3, 1.4**
 
-- [ ] 8. Implement KPI Engine Service
-  - [~] 8.1 Implement 9 KPI calculation functions
+- [x] 8. Implement KPI Engine Service
+  - [x] 8.1 Implement 9 KPI calculation functions
     - Create `/server/src/services/kpi-engine.service.ts` implementing IKpiEngineService
     - Implement Sprint_Commitment: (Complete items / total items) × 100, rounded to 2 decimal places
     - Implement Release_Success_Rate: (non-empty GO Live Date AND Rollback=N / non-empty GO Live Date) × 100, rounded to 2 decimal places
@@ -141,7 +141,7 @@ This plan implements the Engineering Health & Delivery Governance Platform as a 
     - Handle zero-denominator case: return null value with insufficientData=true
     - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7, 3.8, 3.9, 3.11, 3.12_
 
-  - [~] 8.2 Implement filter-scoped KPI calculation and persistence
+  - [x] 8.2 Implement filter-scoped KPI calculation and persistence
     - Implement calculateAll(filter) that queries data by filter then computes all 9 KPIs on the filtered subset
     - Implement calculateSingle(kpiName, filter) for individual KPI recalculation
     - Persist computed KPI results to kpi_results table via KPI results repository with team, portfolio, sprint, period, and timestamp
@@ -164,8 +164,8 @@ This plan implements the Engineering Health & Delivery Governance Platform as a 
     - Create `/server/src/__tests__/properties/kpi-filters.property.test.ts`
     - **Validates: Requirements 3.1-3.12**
 
-- [ ] 9. Implement RAG Classification Service
-  - [~] 9.1 Create RAG classification with threshold-based and trend-based logic
+- [x] 9. Implement RAG Classification Service
+  - [x] 9.1 Create RAG classification with threshold-based and trend-based logic
     - Create `/server/src/services/rag.service.ts` implementing IRagService
     - Implement threshold-based classification for: Sprint_Commitment (>90 green, 80-90 amber, <80 red), Release_Success_Rate (>98 green, 95-98 amber, <95 red), Capacity_Utilization (≥90 green, 75-89 amber, <75 red), AI_Efficiency (within/above target green, within 5pp below amber, >5pp below red), UAT_Predictability (>95 green, 85-95 amber, <85 red), Story_Drop_Rate (<5 green, 5-10 amber, >10 red), Rollback_Rate (<2 green, 2-5 amber, >5 red)
     - Implement trend-based classification for: Deployment_Frequency and Dev_Cycle_Time (>5% improvement green, within 5% amber, >5% regression red)
@@ -182,7 +182,7 @@ This plan implements the Engineering Health & Delivery Governance Platform as a 
 
 - [ ] 10. Checkpoint - Backend business logic complete
   - Ensure all tests pass, ask the user if questions arise.
-  - [~] 10.1 Commit progress
+  - [-] 10.1 Commit progress
     - Stage all changes: `git add -A`
     - Commit with message: `git commit -m "feat: RBAC middleware and data persistence layer"`
     - Then commit upload/KPI/RAG: `git commit --allow-empty -m "feat: upload service, KPI engine, and RAG classification"`
