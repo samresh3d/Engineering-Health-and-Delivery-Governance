@@ -9,7 +9,7 @@ import type { KpiResult, RagStatus, ConfirmUploadRequest, ConfirmUploadResponse,
  * - Response interceptor handles 401 by clearing auth and redirecting to login
  */
 const apiClient = axios.create({
-  baseURL: 'http://localhost:3000',
+  baseURL: import.meta.env.VITE_API_URL || '',
   headers: {
     'Content-Type': 'application/json',
   },

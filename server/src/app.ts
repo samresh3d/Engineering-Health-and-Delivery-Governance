@@ -1,5 +1,6 @@
 import express from 'express';
 import cors from 'cors';
+import path from 'path';
 import { rbacMiddleware } from './middleware/rbac';
 import { errorHandler } from './middleware/error-handler';
 import uploadRoutes from './routes/upload.routes';
@@ -51,5 +52,16 @@ app.use('/api/em', emTeamsRoutes);
 
 // Global error handler (must be AFTER routes)
 app.use(errorHandler);
+
+// Serve client static files in production
+const clientDistPath = path.join(__dirname, '../../client/dist');
+app.use(express.static(clientDistPath));
+
+// SPA fallback: serve index.html for any non-API route
+app.get('*', (req, res) => {
+  if (!req.path.startsWith('/api/')) {
+    res.sendFile(path.join(clientDistPath, 'index.html'));
+  }
+});
 
 export default app;
