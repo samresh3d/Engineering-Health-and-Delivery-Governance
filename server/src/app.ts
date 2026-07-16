@@ -28,7 +28,11 @@ app.use(cors());
 // JSON body parser
 app.use(express.json());
 
-// RBAC middleware applied globally
+// Serve client static files BEFORE any auth (no token needed for frontend assets)
+const clientDistPath = path.join(__dirname, '../../client/dist');
+app.use(express.static(clientDistPath));
+
+// RBAC middleware applied globally (skips non-API routes internally)
 app.use(rbacMiddleware);
 
 // Routes
@@ -53,15 +57,9 @@ app.use('/api/em', emTeamsRoutes);
 // Global error handler (must be AFTER routes)
 app.use(errorHandler);
 
-// Serve client static files in production
-const clientDistPath = path.join(__dirname, '../../client/dist');
-app.use(express.static(clientDistPath));
-
-// SPA fallback: serve index.html for any non-API route
+// SPA fallback: serve index.html for any non-API route not matched by static files
 app.get('*', (req, res) => {
-  if (!req.path.startsWith('/api/')) {
-    res.sendFile(path.join(clientDistPath, 'index.html'));
-  }
+  res.sendFile(path.join(clientDistPath, 'index.html'));
 });
 
 export default app;

@@ -87,6 +87,12 @@ export function rbacMiddleware(
     return;
   }
 
+  // Skip non-API routes (static files, SPA fallback)
+  if (!req.path.startsWith('/api/')) {
+    next();
+    return;
+  }
+
   // Extract Bearer token from Authorization header
   const authHeader = req.headers.authorization;
   if (!authHeader) {
