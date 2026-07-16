@@ -16,6 +16,18 @@ async function loadMigrations(): Promise<Migration[]> {
   const migrations: Migration[] = [];
   const m001 = await import('./migrations/001-initial-schema');
   migrations.push(m001);
+  const m002 = await import('./migrations/002-add-super-admin-role');
+  migrations.push(m002);
+  const m003 = await import('./migrations/003-audit-logs-and-team-id');
+  migrations.push(m003);
+  const m004 = await import('./migrations/004-function-team-hierarchy');
+  migrations.push(m004);
+  const m005 = await import('./migrations/005-function-passwords');
+  migrations.push(m005);
+  const m006 = await import('./migrations/006-seed-ecom-teams');
+  migrations.push(m006);
+  const m007 = await import('./migrations/007-pending-uploads');
+  migrations.push(m007);
   return migrations;
 }
 

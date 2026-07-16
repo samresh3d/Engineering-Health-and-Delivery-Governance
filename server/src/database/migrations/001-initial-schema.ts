@@ -18,7 +18,7 @@ export function up(db: Database.Database): void {
     CREATE TABLE IF NOT EXISTS sprint_data (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       upload_id TEXT NOT NULL REFERENCES uploads(id),
-      sno INTEGER NOT NULL,
+      sno INTEGER,
       team TEXT NOT NULL,
       track TEXT NOT NULL,
       project TEXT NOT NULL,
@@ -27,6 +27,7 @@ export function up(db: Database.Database): void {
       items_list TEXT,
       walkthrough_given_on TEXT,
       jira_id TEXT NOT NULL,
+      estimated_effort_with_ai REAL,
       estimated_effort_without_ai REAL,
       actual_effort_with_ai REAL,
       ai_used TEXT CHECK(ai_used IN ('Y', 'N')),

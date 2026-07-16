@@ -31,6 +31,7 @@ export interface KpiFilter {
   team?: string;
   portfolio?: string;
   project?: string;
+  functionName?: string;
   startDate?: string;
   endDate?: string;
 }
@@ -42,6 +43,40 @@ export interface UploadResult {
   uploadId: string;
   timestamp: string;
 }
+
+/** Response returned when an upload contains unregistered team names (HTTP 409) */
+export interface NewTeamConfirmationResponse {
+  requiresConfirmation: true;
+  newTeams: string[];
+  pendingUploadId: string;
+  message: string;
+}
+
+/** Request body for confirming or declining a pending upload */
+export interface ConfirmUploadRequest {
+  pendingUploadId: string;
+  confirmed: boolean;
+}
+
+/** Response returned after confirming a pending upload */
+export interface ConfirmUploadResponse {
+  success: true;
+  rowsIngested: number;
+  uploadId: string;
+  timestamp: string;
+  teamsCreated: string[];
+}
+
+/** Response returned after declining a pending upload */
+export interface DeclineUploadResponse {
+  success: true;
+  cancelled: true;
+}
+
+/** Union type representing all possible upload API responses */
+export type UploadApiResponse =
+  | UploadResult
+  | NewTeamConfirmationResponse;
 
 /** A single data point in a KPI trend chart */
 export interface TrendDataPoint {

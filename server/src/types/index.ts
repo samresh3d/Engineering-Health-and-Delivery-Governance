@@ -2,6 +2,8 @@
  * Core domain types for the Engineering Health & Delivery Governance Platform.
  */
 
+export type { FunctionRecord, TeamRecord, DropdownOption, SprintDataRowExtended } from './hierarchy.types';
+
 /** Names of the 9 supported KPIs */
 export type KpiName =
   | 'sprint_commitment'
@@ -21,26 +23,27 @@ export type RagStatus = 'green' | 'amber' | 'red';
 export interface SprintDataRow {
   id?: number;
   uploadId: string;
-  sno: number;
+  sno: number | null;
   team: string;
   track: string;
   project: string;
   portfolio: string;
   status: string | null;
   itemsList: string | null;
-  walkthroughGivenOn: string | null;
+  walkthroughGivenOn: string | number | null;
   jiraId: string;
+  estimatedEffortWithAi: number | null;
   estimatedEffortWithoutAi: number | null;
   actualEffortWithAi: number | null;
   aiUsed: 'Y' | 'N' | null;
-  devStartDate: string | null;
-  devEndDate: string | null;
+  devStartDate: string | number | null;
+  devEndDate: string | number | null;
   developmentStatus: string | null;
-  uatDeliveryDate: string | null;
-  uatDeliveryTarget: string | null;
+  uatDeliveryDate: string | number | null;
+  uatDeliveryTarget: string | number | null;
   resources: string | null;
-  goLivePlannedDate: string | null;
-  goLiveDate: string | null;
+  goLivePlannedDate: string | number | null;
+  goLiveDate: string | number | null;
   productionStatus: string | null;
   rollback: 'Y' | 'N' | null;
   rollbackReason: string | null;
@@ -98,6 +101,7 @@ export interface KpiFilter {
   team?: string;
   portfolio?: string;
   project?: string;
+  functionName?: string;
   startDate?: string;
   endDate?: string;
 }
@@ -114,7 +118,30 @@ export interface ThresholdConfig {
 /** Decoded JWT token payload */
 export interface DecodedToken {
   userId: string;
-  role: 'Admin' | 'Engineering_Manager' | 'Delivery_Manager' | 'Leadership';
+  role: 'Admin' | 'Engineering_Manager' | 'Delivery_Manager' | 'Leadership' | 'Super_Admin';
   iat: number;
   exp: number;
+}
+
+/** Admin panel analytics summary */
+export interface AdminAnalytics {
+  totalTeams: number;
+  totalEntries: number;
+  recentUploads: number;
+  pendingItems: number;
+}
+
+/** Team summary for admin team listing */
+export interface TeamSummary {
+  team: string;
+  portfolio: string;
+  entryCount: number;
+}
+
+/** Paginated sprint data entries response */
+export interface PaginatedEntries {
+  entries: SprintDataRow[];
+  total: number;
+  limit: number;
+  offset: number;
 }

@@ -2,7 +2,7 @@
 
 ## Overview
 
-The Engineering Health & Delivery Governance Platform is an internal web application for Axis Max Life that automates tracking of engineering delivery health. The system ingests sprint data via Excel upload, computes 9 KPIs with RAG classification, and presents results on an executive dashboard. The architecture follows a clear client/server split with TypeScript throughout.
+The Engineering Health & Delivery Governance Platform is an internal web application that automates tracking of engineering delivery health. The system ingests sprint data via Excel upload, computes 9 KPIs with RAG classification, and presents results on an executive dashboard. The architecture follows a clear client/server split with TypeScript throughout.
 
 ### Key Design Decisions
 

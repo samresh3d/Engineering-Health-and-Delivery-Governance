@@ -9,6 +9,7 @@ export const kpiFilterSchema = z.object({
   portfolio: z.string().optional(),
   team: z.string().optional(),
   project: z.string().optional(),
+  functionName: z.string().optional(),
   startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Date must be in YYYY-MM-DD format').optional(),
   endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Date must be in YYYY-MM-DD format').optional(),
 });

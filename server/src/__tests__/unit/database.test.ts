@@ -72,7 +72,7 @@ describe('Database Migrations', () => {
 
     // Check all 7 tables exist
     const tables = db
-      .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE '_%' ORDER BY name")
+      .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE '\\_%' ESCAPE '\\' ORDER BY name")
       .all() as { name: string }[];
     const tableNames = tables.map((t) => t.name);
 
@@ -108,9 +108,15 @@ describe('Database Migrations', () => {
       description: string;
     }[];
 
-    expect(rows).toHaveLength(1);
+    expect(rows).toHaveLength(4);
     expect(rows[0].id).toBe('001-initial-schema');
     expect(rows[0].description).toBe('Create initial database schema with all 7 tables and indexes');
+    expect(rows[1].id).toBe('002-add-super-admin-role');
+    expect(rows[1].description).toBe('Add Super_Admin role to users table CHECK constraint');
+    expect(rows[2].id).toBe('003-audit-logs-and-team-id');
+    expect(rows[2].description).toBe('Add team_id to users table and create audit_logs table');
+    expect(rows[3].id).toBe('004-function-team-hierarchy');
+    expect(rows[3].description).toBe('Add Function-Team hierarchy, dropdown_options, and new sprint_data fields');
   });
 
   it('is idempotent - does not re-apply already applied migrations', async () => {
@@ -121,7 +127,7 @@ describe('Database Migrations', () => {
 
     const db = getDatabase();
     const rows = db.prepare('SELECT id FROM _migrations').all();
-    expect(rows).toHaveLength(1);
+    expect(rows).toHaveLength(4);
   });
 
   it('sprint_data table enforces UNIQUE(jira_id, team) constraint', async () => {

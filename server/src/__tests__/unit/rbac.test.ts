@@ -114,6 +114,8 @@ describe('RBAC Middleware', () => {
       expect((req as Partial<AuthenticatedRequest>).user).toEqual({
         userId: 'user-admin-001',
         role: 'Admin',
+        teamId: null,
+        functionId: null,
       });
     });
   });
@@ -136,6 +138,21 @@ describe('RBAC Middleware', () => {
 
     it('should allow Engineering_Manager to access /api/upload', () => {
       const token = generateToken({ userId: 'user-em-001', role: 'Engineering_Manager' });
+      const req = createMockRequest({
+        path: '/api/upload',
+        headers: { authorization: `Bearer ${token}` },
+      });
+      const { res } = createMockResponse();
+      let nextCalled = false;
+      const next = () => { nextCalled = true; };
+
+      rbacMiddleware(req as Request, res, next);
+
+      expect(nextCalled).toBe(true);
+    });
+
+    it('should allow Super_Admin to access /api/upload', () => {
+      const token = generateToken({ userId: 'user-sa-001', role: 'Super_Admin' });
       const req = createMockRequest({
         path: '/api/upload',
         headers: { authorization: `Bearer ${token}` },
@@ -179,7 +196,7 @@ describe('RBAC Middleware', () => {
     });
 
     it('should allow all roles to access /api/dashboard/* routes', () => {
-      const roles = ['Admin', 'Engineering_Manager', 'Delivery_Manager', 'Leadership'];
+      const roles = ['Admin', 'Engineering_Manager', 'Delivery_Manager', 'Leadership', 'Super_Admin'];
       for (const role of roles) {
         const token = generateToken({ userId: `user-${role}`, role });
         const req = createMockRequest({
@@ -196,7 +213,7 @@ describe('RBAC Middleware', () => {
       }
     });
 
-    it('should only allow Admin to access /api/config/* routes', () => {
+    it('should only allow Admin and Super_Admin to access /api/config/* routes', () => {
       // Admin should have access
       const adminToken = generateToken({ userId: 'user-admin-001', role: 'Admin' });
       const adminReq = createMockRequest({
@@ -207,6 +224,17 @@ describe('RBAC Middleware', () => {
       let adminNextCalled = false;
       rbacMiddleware(adminReq as Request, adminRes, () => { adminNextCalled = true; });
       expect(adminNextCalled).toBe(true);
+
+      // Super_Admin should have access
+      const saToken = generateToken({ userId: 'user-sa-001', role: 'Super_Admin' });
+      const saReq = createMockRequest({
+        path: '/api/config/thresholds',
+        headers: { authorization: `Bearer ${saToken}` },
+      });
+      const { res: saRes } = createMockResponse();
+      let saNextCalled = false;
+      rbacMiddleware(saReq as Request, saRes, () => { saNextCalled = true; });
+      expect(saNextCalled).toBe(true);
 
       // Other roles should be denied
       const otherRoles = ['Engineering_Manager', 'Delivery_Manager', 'Leadership'];
@@ -222,8 +250,8 @@ describe('RBAC Middleware', () => {
       }
     });
 
-    it('should allow Engineering_Manager, Delivery_Manager, Leadership to access /api/reports/*', () => {
-      const allowedRoles = ['Engineering_Manager', 'Delivery_Manager', 'Leadership'];
+    it('should allow Engineering_Manager, Delivery_Manager, Leadership, Super_Admin to access /api/reports/*', () => {
+      const allowedRoles = ['Engineering_Manager', 'Delivery_Manager', 'Leadership', 'Super_Admin'];
       for (const role of allowedRoles) {
         const token = generateToken({ userId: `user-${role}`, role });
         const req = createMockRequest({
@@ -248,7 +276,7 @@ describe('RBAC Middleware', () => {
     });
 
     it('should allow all roles to access /api/filters/* routes', () => {
-      const roles = ['Admin', 'Engineering_Manager', 'Delivery_Manager', 'Leadership'];
+      const roles = ['Admin', 'Engineering_Manager', 'Delivery_Manager', 'Leadership', 'Super_Admin'];
       for (const role of roles) {
         const token = generateToken({ userId: `user-${role}`, role });
         const req = createMockRequest({
@@ -259,6 +287,36 @@ describe('RBAC Middleware', () => {
         let nextCalled = false;
         rbacMiddleware(req as Request, res, () => { nextCalled = true; });
         expect(nextCalled).toBe(true);
+      }
+    });
+
+    it('should allow Super_Admin to access /api/admin/* routes', () => {
+      const token = generateToken({ userId: 'user-sa-001', role: 'Super_Admin' });
+      const paths = ['/api/admin/analytics', '/api/admin/teams', '/api/admin/entries'];
+      for (const path of paths) {
+        const req = createMockRequest({
+          path,
+          headers: { authorization: `Bearer ${token}` },
+        });
+        const { res } = createMockResponse();
+        let nextCalled = false;
+        rbacMiddleware(req as Request, res, () => { nextCalled = true; });
+        expect(nextCalled).toBe(true);
+      }
+    });
+
+    it('should deny non-Super_Admin users access to /api/admin/* routes with 403', () => {
+      const deniedRoles = ['Admin', 'Engineering_Manager', 'Delivery_Manager', 'Leadership'];
+      for (const role of deniedRoles) {
+        const token = generateToken({ userId: `user-${role}`, role });
+        const req = createMockRequest({
+          path: '/api/admin/analytics',
+          headers: { authorization: `Bearer ${token}` },
+        });
+        const { res, result } = createMockResponse();
+        rbacMiddleware(req as Request, res, () => { throw new Error('should not call next'); });
+        expect(result.statusCode).toBe(403);
+        expect(result.body).toHaveProperty('error');
       }
     });
   });
@@ -295,9 +353,10 @@ describe('RBAC Middleware', () => {
     });
 
     it('getAllowedRoles should return correct roles for known routes', () => {
-      expect(getAllowedRoles('/api/upload')).toEqual(['Admin', 'Engineering_Manager']);
-      expect(getAllowedRoles('/api/config/thresholds')).toEqual(['Admin']);
-      expect(getAllowedRoles('/api/dashboard/kpis')).toEqual(['Admin', 'Engineering_Manager', 'Delivery_Manager', 'Leadership']);
+      expect(getAllowedRoles('/api/upload')).toEqual(['Admin', 'Engineering_Manager', 'Super_Admin']);
+      expect(getAllowedRoles('/api/config/thresholds')).toEqual(['Admin', 'Super_Admin']);
+      expect(getAllowedRoles('/api/dashboard/kpis')).toEqual(['Admin', 'Engineering_Manager', 'Delivery_Manager', 'Leadership', 'Super_Admin']);
+      expect(getAllowedRoles('/api/admin/analytics')).toEqual(['Super_Admin']);
     });
 
     it('getAllowedRoles should return null for unknown routes', () => {

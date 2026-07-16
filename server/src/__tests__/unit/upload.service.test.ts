@@ -24,29 +24,35 @@ function createExcelBuffer(
  * Helper: creates valid sample data rows matching the required columns.
  */
 function createValidRow(): (string | number | null)[] {
+  // Order matches REQUIRED_COLUMNS:
+  // Sno, Project, Items list, Walkthrough given on (To Dev team), JIRA ID,
+  // Dev Start, Dev End Date, Estimated Effort With AI (SP), Development Status,
+  // UAT Delivery Date, UAT delivery target, Resources, GO Live planned Date,
+  // GO Live Date, Production Status, Rollback (Y/N), Rollback Reason,
+  // AI Used (Y/N), Estimated Effort Without AI (Hrs), Actual Effort With AI (Hrs),
+  // Story Status, Story Drop Reason
   return [
     1,              // Sno
-    'Team Alpha',   // TEAM
-    'Backend',      // Track
-    'Project X',    // Project
-    'Active',       // Status
-    'Item 1',       // Items List
-    '01-01-2024',   // Walkthrough Given On
-    'PROJ-123',     // JIRA ID
-    5,              // Estimated Effort Without AI (SP)
-    3,              // Actual Effort With AI (Hrs)
-    'Y',            // AI Used (Y/N)
-    '01-01-2024',   // Dev Start Date
+    'Savings SPA1', // Project
+    'Item 1',       // Items list
+    '01-01-2024',   // Walkthrough given on (To Dev team)
+    'SPS1-123',     // JIRA ID
+    '01-01-2024',   // Dev Start
     '15-01-2024',   // Dev End Date
-    'Completed',    // Development Status
+    5,              // Estimated Effort With AI (SP)
+    'COMPLETE',     // Development Status
     '20-01-2024',   // UAT Delivery Date
-    '18-01-2024',   // UAT Delivery Target
+    '18-01-2024',   // UAT delivery target
     'Dev1',         // Resources
-    '25-01-2024',   // GO Live Planned Date
+    '25-01-2024',   // GO Live planned Date
     '25-01-2024',   // GO Live Date
     'Live',         // Production Status
     'N',            // Rollback (Y/N)
     null,           // Rollback Reason
+    'Y',            // AI Used (Y/N)
+    8,              // Estimated Effort Without AI (Hrs)
+    3,              // Actual Effort With AI (Hrs)
+    'COMPLETE',     // Story Status
     null,           // Story Drop Reason
   ];
 }
@@ -143,14 +149,14 @@ describe('UploadService', () => {
 
     it('should report multiple missing columns', () => {
       const headers = [...REQUIRED_COLUMNS].filter(
-        (h) => h !== 'JIRA ID' && h !== 'TEAM' && h !== 'Track'
+        (h) => h !== 'JIRA ID' && h !== 'Project' && h !== 'Items list'
       );
       const errors = service.validateColumns(headers);
       expect(errors).toHaveLength(3);
       const fields = errors.map((e) => e.field);
       expect(fields).toContain('JIRA ID');
-      expect(fields).toContain('TEAM');
-      expect(fields).toContain('Track');
+      expect(fields).toContain('Project');
+      expect(fields).toContain('Items list');
     });
 
     it('should handle headers with leading/trailing whitespace', () => {
@@ -209,8 +215,8 @@ describe('UploadService', () => {
     });
 
     it('should reject files with missing required columns', async () => {
-      const incompleteHeaders = ['Sno', 'TEAM', 'Track'];
-      const buffer = createExcelBuffer(incompleteHeaders, [[1, 'A', 'B']]);
+      const incompleteHeaders = ['Sno', 'JIRA ID', 'Project'];
+      const buffer = createExcelBuffer(incompleteHeaders, [[1, 'SPS1-1', 'A']]);
 
       await expect(
         service.processFile(buffer, 'data.xlsx', 'user-1')
@@ -221,7 +227,7 @@ describe('UploadService', () => {
       } catch (err) {
         const validationErr = err as UploadValidationError;
         expect(validationErr.errors.length).toBeGreaterThan(0);
-        // Should report 20 missing columns (23 - 3 provided)
+        // Should report 19 missing columns (22 - 3 provided)
         expect(validationErr.errors).toHaveLength(REQUIRED_COLUMNS.length - 3);
       }
     });
@@ -281,14 +287,14 @@ describe('UploadService', () => {
   });
 
   describe('REQUIRED_COLUMNS', () => {
-    it('should contain 23 columns', () => {
-      expect(REQUIRED_COLUMNS).toHaveLength(23);
+    it('should contain 22 columns', () => {
+      expect(REQUIRED_COLUMNS).toHaveLength(22);
     });
 
     it('should include key columns', () => {
       expect(REQUIRED_COLUMNS).toContain('Sno');
       expect(REQUIRED_COLUMNS).toContain('JIRA ID');
-      expect(REQUIRED_COLUMNS).toContain('TEAM');
+      expect(REQUIRED_COLUMNS).toContain('Project');
       expect(REQUIRED_COLUMNS).toContain('Story Drop Reason');
       expect(REQUIRED_COLUMNS).toContain('Rollback (Y/N)');
     });

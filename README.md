@@ -1,6 +1,6 @@
 # Engineering Health & Delivery Governance Platform
 
-An internal web application for Axis Max Life that automates tracking of engineering delivery health. The system ingests sprint data via Excel upload, computes 9 KPIs with RAG (Red/Amber/Green) classification, and presents results on an executive dashboard.
+An internal web application that automates tracking of engineering delivery health. The system ingests sprint data via Excel upload, computes 9 KPIs with RAG (Red/Amber/Green) classification, and presents results on an executive dashboard.
 
 ## Architecture
 
@@ -104,4 +104,4 @@ npm run preview
 
 ## License
 
-Internal use only — Axis Max Life.
+MIT

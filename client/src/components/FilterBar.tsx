@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import apiClient from '../api/client';
+import { getRole } from '../auth';
 import type { KpiFilter } from '../types';
 import { colors } from '../theme';
 
@@ -8,16 +9,42 @@ interface FilterBarProps {
 }
 
 /**
- * FilterBar — portfolio dropdown, team dropdown (filtered by portfolio), and date range picker.
+ * FilterBar — Function dropdown (Leadership/Super_Admin only), portfolio dropdown,
+ * team dropdown (cascaded by Function when selected), and date range picker.
  * On any change, fires onFilterChange with the current filter state.
  */
 export default function FilterBar({ onFilterChange }: FilterBarProps) {
+  const [functions, setFunctions] = useState<string[]>([]);
   const [portfolios, setPortfolios] = useState<string[]>([]);
   const [teams, setTeams] = useState<string[]>([]);
+  const [selectedFunction, setSelectedFunction] = useState<string>('');
   const [selectedPortfolio, setSelectedPortfolio] = useState<string>('');
   const [selectedTeam, setSelectedTeam] = useState<string>('');
   const [startDate, setStartDate] = useState<string>('');
   const [endDate, setEndDate] = useState<string>('');
+
+  const userRole = getRole();
+  const showFunctionFilter = userRole === 'Leadership' || userRole === 'Super_Admin';
+
+  // Fetch functions on mount (Leadership/Super_Admin only)
+  useEffect(() => {
+    if (!showFunctionFilter) return;
+
+    apiClient
+      .get<{ success: boolean; data: string[] }>('/api/filters/functions')
+      .then((res) => {
+        const data = res.data;
+        // Handle both wrapped { success, data } and plain array responses
+        if (Array.isArray(data)) {
+          setFunctions(data);
+        } else if (data && Array.isArray(data.data)) {
+          setFunctions(data.data);
+        } else {
+          setFunctions([]);
+        }
+      })
+      .catch(() => setFunctions([]));
+  }, [showFunctionFilter]);
 
   // Fetch portfolios on mount
   useEffect(() => {
@@ -27,22 +54,55 @@ export default function FilterBar({ onFilterChange }: FilterBarProps) {
       .catch(() => setPortfolios([]));
   }, []);
 
-  // Fetch teams when portfolio changes
+  // Fetch teams when Function or portfolio changes
+  // When Function is selected, cascade teams to only that Function's teams (Req 11.2)
+  // When no Function selected, show all teams across all functions (Req 11.8)
   useEffect(() => {
-    const params = selectedPortfolio
-      ? { portfolio: selectedPortfolio }
-      : undefined;
+    const params: Record<string, string> = {};
+
+    if (selectedFunction) {
+      params.functionName = selectedFunction;
+    } else if (selectedPortfolio) {
+      params.portfolio = selectedPortfolio;
+    }
 
     apiClient
-      .get<string[]>('/api/filters/teams', { params })
-      .then((res) => setTeams(res.data))
+      .get<string[] | { success: boolean; data: Array<{ teamName: string }> | string[] }>(
+        '/api/filters/teams',
+        { params }
+      )
+      .then((res) => {
+        const data = res.data;
+        // Handle different response shapes from the API
+        if (Array.isArray(data)) {
+          // Plain array of strings (legacy)
+          setTeams(data);
+        } else if (data && Array.isArray(data.data)) {
+          // Wrapped response: { success, data: [...] }
+          const teamData = data.data;
+          if (teamData.length > 0 && typeof teamData[0] === 'object' && 'teamName' in teamData[0]) {
+            // Array of { teamName, functionName } objects
+            setTeams((teamData as Array<{ teamName: string }>).map((t) => t.teamName));
+          } else {
+            // Array of strings or TeamConfig objects with teamName
+            setTeams(
+              (teamData as Array<string | { teamName: string }>).map((t) =>
+                typeof t === 'string' ? t : t.teamName
+              )
+            );
+          }
+        } else {
+          setTeams([]);
+        }
+      })
       .catch(() => setTeams([]));
-  }, [selectedPortfolio]);
+  }, [selectedFunction, selectedPortfolio]);
 
   // Notify parent whenever any filter value changes
   const emitFilter = useCallback(
-    (portfolio: string, team: string, start: string, end: string) => {
+    (functionName: string, portfolio: string, team: string, start: string, end: string) => {
       const filter: KpiFilter = {};
+      if (functionName) filter.functionName = functionName;
       if (portfolio) filter.portfolio = portfolio;
       if (team) filter.team = team;
       if (start) filter.startDate = start;
@@ -52,25 +112,31 @@ export default function FilterBar({ onFilterChange }: FilterBarProps) {
     [onFilterChange],
   );
 
+  const handleFunctionChange = (value: string) => {
+    setSelectedFunction(value);
+    setSelectedTeam('');
+    emitFilter(value, selectedPortfolio, '', startDate, endDate);
+  };
+
   const handlePortfolioChange = (value: string) => {
     setSelectedPortfolio(value);
     setSelectedTeam('');
-    emitFilter(value, '', startDate, endDate);
+    emitFilter(selectedFunction, value, '', startDate, endDate);
   };
 
   const handleTeamChange = (value: string) => {
     setSelectedTeam(value);
-    emitFilter(selectedPortfolio, value, startDate, endDate);
+    emitFilter(selectedFunction, selectedPortfolio, value, startDate, endDate);
   };
 
   const handleStartDateChange = (value: string) => {
     setStartDate(value);
-    emitFilter(selectedPortfolio, selectedTeam, value, endDate);
+    emitFilter(selectedFunction, selectedPortfolio, selectedTeam, value, endDate);
   };
 
   const handleEndDateChange = (value: string) => {
     setEndDate(value);
-    emitFilter(selectedPortfolio, selectedTeam, startDate, value);
+    emitFilter(selectedFunction, selectedPortfolio, selectedTeam, startDate, value);
   };
 
   return (
@@ -88,6 +154,28 @@ export default function FilterBar({ onFilterChange }: FilterBarProps) {
       aria-label="Dashboard filters"
       role="toolbar"
     >
+      {/* Function dropdown — visible only to Leadership/Super_Admin (Req 11.5, 11.6) */}
+      {showFunctionFilter && (
+        <label style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+          <span style={{ fontSize: '12px', fontWeight: 600, color: colors.text }}>
+            Function
+          </span>
+          <select
+            value={selectedFunction}
+            onChange={(e) => handleFunctionChange(e.target.value)}
+            aria-label="Select function"
+            style={selectStyle}
+          >
+            <option value="">All Functions</option>
+            {functions.map((f) => (
+              <option key={f} value={f}>
+                {f}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
+
       {/* Portfolio dropdown */}
       <label style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
         <span style={{ fontSize: '12px', fontWeight: 600, color: colors.text }}>

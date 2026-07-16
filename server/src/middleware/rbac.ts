@@ -1,14 +1,16 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { DecodedToken } from '../types';
+import { getDatabase } from '../database';
 
 const JWT_SECRET = 'engineering-health-platform-secret';
 
 /**
  * Extended Express Request that includes decoded user context after authentication.
+ * Includes teamId fetched from the users table for team-scoped data isolation.
  */
 export interface AuthenticatedRequest extends Request {
-  user: { userId: string; role: string };
+  user: { userId: string; role: string; teamId: string | null; functionId: number | null };
 }
 
 /**
@@ -16,11 +18,23 @@ export interface AuthenticatedRequest extends Request {
  * Wildcard (*) patterns match any sub-path.
  */
 const ROUTE_PERMISSIONS: Record<string, string[]> = {
-  '/api/upload': ['Admin', 'Engineering_Manager'],
-  '/api/dashboard/*': ['Admin', 'Engineering_Manager', 'Delivery_Manager', 'Leadership'],
-  '/api/config/*': ['Admin'],
-  '/api/reports/*': ['Engineering_Manager', 'Delivery_Manager', 'Leadership'],
-  '/api/filters/*': ['Admin', 'Engineering_Manager', 'Delivery_Manager', 'Leadership'],
+  '/api/upload': ['Admin', 'Engineering_Manager', 'Super_Admin'],
+  '/api/uploads/*': ['Admin', 'Engineering_Manager', 'Super_Admin'],
+  '/api/dashboard/*': ['Admin', 'Engineering_Manager', 'Delivery_Manager', 'Leadership', 'Super_Admin'],
+  '/api/config/dropdowns': ['Admin', 'Engineering_Manager', 'Delivery_Manager', 'Leadership', 'Super_Admin'],
+  '/api/config/dropdowns/*': ['Admin', 'Engineering_Manager', 'Delivery_Manager', 'Leadership', 'Super_Admin'],
+  '/api/config/*': ['Admin', 'Super_Admin'],
+  '/api/reports/*': ['Engineering_Manager', 'Delivery_Manager', 'Leadership', 'Super_Admin'],
+  '/api/filters/*': ['Admin', 'Engineering_Manager', 'Delivery_Manager', 'Leadership', 'Super_Admin'],
+  '/api/admin/*': ['Super_Admin'],
+  '/api/analytics/*': ['Engineering_Manager', 'Leadership', 'Super_Admin'],
+  '/api/audit-logs/*': ['Super_Admin'],
+  '/api/audit-logs': ['Super_Admin'],
+  '/api/users/*': ['Admin', 'Engineering_Manager', 'Delivery_Manager', 'Leadership', 'Super_Admin'],
+  '/api/submissions/*': ['Engineering_Manager', 'Leadership', 'Super_Admin'],
+  '/api/divisions': ['Engineering_Manager', 'Leadership', 'Super_Admin'],
+  '/api/divisions/*': ['Engineering_Manager', 'Leadership', 'Super_Admin'],
+  '/api/governance/*': ['Engineering_Manager', 'Leadership', 'Super_Admin'],
 };
 
 /**
@@ -122,9 +136,25 @@ export function rbacMiddleware(
   }
 
   // Attach user context to request and proceed
+  // Fetch team_id and function_id from users table to include context for downstream handlers.
+  // This avoids an extra DB lookup on every data-access request.
+  let teamId: string | null = null;
+  let functionId: number | null = null;
+  try {
+    const db = getDatabase();
+    const userRow = db.prepare('SELECT team_id, function_id FROM users WHERE id = ?').get(decoded.userId) as { team_id: string | null; function_id: number | null } | undefined;
+    teamId = userRow?.team_id ?? null;
+    functionId = userRow?.function_id ?? null;
+  } catch {
+    // If DB lookup fails, continue with null teamId/functionId.
+    // Data-scope middleware will handle authorization checks downstream.
+  }
+
   (req as AuthenticatedRequest).user = {
     userId: decoded.userId,
     role: decoded.role,
+    teamId,
+    functionId,
   };
 
   next();

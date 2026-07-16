@@ -1,4 +1,5 @@
 import type { SprintDataRow, KpiName, KpiResult, KpiFilter, KpiComputedResult, RagStatus } from '../types/index';
+import type { HealthScoreData } from '../types/governance.types';
 import type { ISprintDataRepository, IKpiResultsRepository, IConfigRepository } from '../repositories/interfaces';
 
 /**
@@ -27,13 +28,35 @@ export interface KpiCalculationResult {
 }
 
 /**
- * Parses a date string in "DD-MM-YYYY" or "YYYY-MM-DD" format into a Date object.
- * Returns null if the string is null, empty, or unparseable.
+ * Converts an Excel serial date number to a Date object.
+ * Excel's epoch is January 0, 1900 (serial number 1 = Jan 1, 1900).
+ * Accounts for the Lotus 1-2-3 leap year bug (serial 60 = Feb 29, 1900 which didn't exist).
  */
-export function parseDate(dateStr: string | null): Date | null {
-  if (!dateStr || dateStr.trim() === '') return null;
+function excelSerialToDate(serial: number): Date | null {
+  if (serial <= 0) return null;
+  // Excel epoch: Dec 30, 1899 (because Excel thinks 1900 is a leap year)
+  const excelEpoch = new Date(1899, 11, 30);
+  const msPerDay = 24 * 60 * 60 * 1000;
+  const date = new Date(excelEpoch.getTime() + serial * msPerDay);
+  if (isNaN(date.getTime())) return null;
+  return date;
+}
 
-  const trimmed = dateStr.trim();
+/**
+ * Parses a date value (string or Excel serial number) into a Date object.
+ * Supports: DD-MM-YYYY, YYYY-MM-DD, DD-MMM-YY, DD-MMM-YYYY, and Excel serial numbers.
+ * Returns null if the value is null, empty, or unparseable.
+ */
+export function parseDate(dateVal: string | number | null): Date | null {
+  if (dateVal === null || dateVal === undefined) return null;
+
+  // Handle Excel serial date numbers
+  if (typeof dateVal === 'number') {
+    return excelSerialToDate(dateVal);
+  }
+
+  const trimmed = dateVal.trim();
+  if (trimmed === '') return null;
 
   // Try DD-MM-YYYY format
   const ddmmyyyy = /^(\d{2})-(\d{2})-(\d{4})$/;
@@ -57,6 +80,27 @@ export function parseDate(dateStr: string | null): Date | null {
     if (!isNaN(d.getTime())) return d;
   }
 
+  // Try DD-MMM-YY or DD-MMM-YYYY format (e.g., "30-Apr-26" or "30-Apr-2026")
+  const ddmmmyy = /^(\d{1,2})-([A-Za-z]{3})-(\d{2,4})$/;
+  const match3 = trimmed.match(ddmmmyy);
+  if (match3) {
+    const day = parseInt(match3[1], 10);
+    const monthStr = match3[2];
+    let year = parseInt(match3[3], 10);
+    // Convert 2-digit year to 4-digit (assume 2000s for < 100)
+    if (year < 100) year += 2000;
+
+    const months: Record<string, number> = {
+      jan: 0, feb: 1, mar: 2, apr: 3, may: 4, jun: 5,
+      jul: 6, aug: 7, sep: 8, oct: 9, nov: 10, dec: 11,
+    };
+    const month = months[monthStr.toLowerCase()];
+    if (month !== undefined) {
+      const d = new Date(year, month, day);
+      if (!isNaN(d.getTime())) return d;
+    }
+  }
+
   return null;
 }
 
@@ -75,6 +119,26 @@ function daysBetween(start: Date, end: Date): number {
 function roundTo(value: number, decimals: number): number {
   const factor = Math.pow(10, decimals);
   return Math.round(value * factor) / factor;
+}
+
+/**
+ * Checks whether a date field value is "non-empty" (has a meaningful date value).
+ * Handles string | number | null types from the SprintDataRow.
+ */
+function isNonEmptyDate(val: string | number | null): boolean {
+  if (val === null || val === undefined) return false;
+  if (typeof val === 'number') return val > 0;
+  return val.trim() !== '';
+}
+
+/**
+ * Converts a date field value to a string representation for use in Sets, etc.
+ * Excel serial numbers are converted to a string representation.
+ */
+function dateToKey(val: string | number | null): string {
+  if (val === null || val === undefined) return '';
+  if (typeof val === 'number') return String(val);
+  return val.trim();
 }
 
 /**
@@ -103,7 +167,7 @@ export function calculateSprintCommitment(rows: SprintDataRow[]): KpiCalculation
  * Denominator = items with non-empty GO Live Date. If zero, return null with insufficientData=true.
  */
 export function calculateReleaseSuccessRate(rows: SprintDataRow[]): KpiCalculationResult {
-  const withGoLive = rows.filter((r) => r.goLiveDate !== null && r.goLiveDate.trim() !== '');
+  const withGoLive = rows.filter((r) => isNonEmptyDate(r.goLiveDate));
   const denominator = withGoLive.length;
 
   if (denominator === 0) {
@@ -130,8 +194,8 @@ export function calculateDeploymentFrequency(rows: SprintDataRow[]): KpiCalculat
 
   const distinctDates = new Set<string>();
   for (const row of rows) {
-    if (row.goLiveDate !== null && row.goLiveDate.trim() !== '') {
-      distinctDates.add(row.goLiveDate.trim());
+    if (isNonEmptyDate(row.goLiveDate)) {
+      distinctDates.add(dateToKey(row.goLiveDate));
     }
   }
 
@@ -281,7 +345,7 @@ export function calculateStoryDropRate(rows: SprintDataRow[]): KpiCalculationRes
  * Denominator = items with non-empty GO Live Date. If zero, return null with insufficientData=true.
  */
 export function calculateRollbackRate(rows: SprintDataRow[]): KpiCalculationResult {
-  const withGoLive = rows.filter((r) => r.goLiveDate !== null && r.goLiveDate.trim() !== '');
+  const withGoLive = rows.filter((r) => isNonEmptyDate(r.goLiveDate));
   const denominator = withGoLive.length;
 
   if (denominator === 0) {
@@ -314,6 +378,26 @@ export const KPI_CALCULATORS: Record<
   rollback_rate: calculateRollbackRate,
 };
 
+
+/**
+ * Computes a composite Health Score from a set of KPI results.
+ * - Maps RAG statuses: Green=100, Amber=50, Red=0
+ * - Computes arithmetic mean rounded to nearest integer
+ * - Classifies result: >=80 Green, 50-79 Amber, <50 Red
+ * - Returns null when no valid KPI data available
+ */
+export function computeHealthScore(kpiResults: KpiResult[]): HealthScoreData | null {
+  const validResults = kpiResults.filter(r => r.value !== null && !r.insufficientData);
+  if (validResults.length === 0) return null;
+
+  const ragValues: Record<RagStatus, number> = { green: 100, amber: 50, red: 0 };
+  const sum = validResults.reduce((acc, r) => acc + ragValues[r.ragStatus], 0);
+  const value = Math.round(sum / validResults.length);
+
+  const ragStatus: RagStatus = value >= 80 ? 'green' : value >= 50 ? 'amber' : 'red';
+
+  return { value, ragStatus };
+}
 
 /** All 9 KPI names */
 const ALL_KPI_NAMES: KpiName[] = [

@@ -2,7 +2,7 @@
 
 ## Introduction
 
-The Engineering Health & Delivery Governance Platform is an internal tool for Axis Max Life that enables engineering leadership to track delivery health across portfolios. In MVP (Phase 1), the platform supports Excel-based data ingestion, calculates 9 key performance indicators, and presents results on an executive dashboard with RAG status indicators. Access is governed by a stubbed RBAC system with four roles. The tech stack consists of a React/TypeScript frontend and a Node.js/Express/TypeScript backend with SQLite persistence.
+The Engineering Health & Delivery Governance Platform is an internal tool that enables engineering leadership to track delivery health across portfolios. In MVP (Phase 1), the platform supports Excel-based data ingestion, calculates 9 key performance indicators, and presents results on an executive dashboard with RAG status indicators. Access is governed by a stubbed RBAC system with four roles. The tech stack consists of a React/TypeScript frontend and a Node.js/Express/TypeScript backend with SQLite persistence.
 
 ## Glossary
 
@@ -109,7 +109,7 @@ The Engineering Health & Delivery Governance Platform is an internal tool for Ax
 5. WHEN both a portfolio filter and a team filter are selected, THE Dashboard SHALL display KPI values scoped to the selected team within the selected portfolio.
 6. THE Dashboard SHALL display the six supported portfolios (IBPS-POS, IBPS-Dolphin, IBPS-Claims, mPro, E-Commerce, POSV/IVC) as available filter options.
 7. IF no data exists for the selected filter combination, THEN THE Dashboard SHALL display the KPI tiles with a "No data available" indicator in place of values and omit trend chart rendering for those KPIs.
-8. THE Dashboard SHALL render using the Axis Max Life brand theme with Burgundy/Maroon as the primary color, White backgrounds, Light Grey secondary areas, and Dark Grey text.
+8. THE Dashboard SHALL render using the platform brand theme with Burgundy/Maroon as the primary color, White backgrounds, Light Grey secondary areas, and Dark Grey text.
 9. THE Dashboard SHALL display RAG status using Green (#28A745) for Healthy, Amber (#FFC107) for Attention, and Red (#DC3545) for Critical indicators.
 10. THE Dashboard SHALL use AG Grid for tabular data displays and Recharts for chart visualizations.
 

@@ -26,6 +26,7 @@ function makeRow(overrides: Partial<SprintDataRow> = {}): SprintDataRow {
     itemsList: null,
     walkthroughGivenOn: null,
     jiraId: 'PROJ-1',
+    estimatedEffortWithAi: null,
     estimatedEffortWithoutAi: null,
     actualEffortWithAi: null,
     aiUsed: null,

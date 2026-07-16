@@ -130,6 +130,6 @@ describe('KpiTile', () => {
         insufficientData={false}
       />
     );
-    expect(screen.getByRole('img', { name: /status: green/i })).toBeInTheDocument();
+    expect(screen.getByRole('status', { name: /status: healthy/i })).toBeInTheDocument();
   });
 });

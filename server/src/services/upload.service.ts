@@ -6,32 +6,41 @@ import type { ISprintDataRepository, IConfigRepository } from '../repositories/i
 import { excelRowSchema } from '../schemas/excel-row.schema';
 
 /**
- * The 23 required column headers expected in uploaded Excel files.
- * (The spec references "22 required columns" but the enumerated list contains 23.)
+ * The 22 required column headers expected in uploaded Excel files.
+ * These match the actual Excel file structure from the Engineering Health &
+ * Delivery Governance workbook (Sheet2).
+ *
+ * Key differences from the original spec assumption:
+ * - No separate "TEAM" or "Track" columns — "Project " serves as the team identifier
+ * - "Status" is named "Story Status"
+ * - "Items List" is "Items list" (lowercase 'l')
+ * - "Walkthrough Given On" is "Walkthrough given on (To Dev team)"
+ * - "Estimated Effort Without AI (SP)" is "Estimated Effort Without AI (Hrs)"
+ * - "Dev Start Date" is "Dev Start " (trailing space, no "Date")
+ * - Additional column "Estimated Effort With AI (SP)" exists
  */
 export const REQUIRED_COLUMNS: readonly string[] = [
   'Sno',
-  'TEAM',
-  'Track',
   'Project',
-  'Status',
-  'Items List',
-  'Walkthrough Given On',
+  'Items list',
+  'Walkthrough given on (To Dev team)',
   'JIRA ID',
-  'Estimated Effort Without AI (SP)',
-  'Actual Effort With AI (Hrs)',
-  'AI Used (Y/N)',
-  'Dev Start Date',
+  'Dev Start',
   'Dev End Date',
+  'Estimated Effort With AI (SP)',
   'Development Status',
   'UAT Delivery Date',
-  'UAT Delivery Target',
+  'UAT delivery target',
   'Resources',
-  'GO Live Planned Date',
+  'GO Live planned Date',
   'GO Live Date',
   'Production Status',
   'Rollback (Y/N)',
   'Rollback Reason',
+  'AI Used (Y/N)',
+  'Estimated Effort Without AI (Hrs)',
+  'Actual Effort With AI (Hrs)',
+  'Story Status',
   'Story Drop Reason',
 ] as const;
 
@@ -44,30 +53,33 @@ const ACCEPTED_EXTENSIONS = ['.xlsx', '.xls'];
 /** Maximum number of validation errors reported per file */
 const MAX_VALIDATION_ERRORS = 100;
 
-/** Mapping from Excel column header to SprintDataRow field name */
+/**
+ * Mapping from actual Excel column headers to SprintDataRow field names.
+ * The Excel uses "Project" as the team/project identifier (no separate TEAM/Track columns).
+ * "Project" maps to both 'team' and 'project' fields; 'track' is derived from 'project'.
+ */
 const COLUMN_FIELD_MAP: Record<string, string> = {
   'Sno': 'sno',
-  'TEAM': 'team',
-  'Track': 'track',
   'Project': 'project',
-  'Status': 'status',
-  'Items List': 'itemsList',
-  'Walkthrough Given On': 'walkthroughGivenOn',
+  'Items list': 'itemsList',
+  'Walkthrough given on (To Dev team)': 'walkthroughGivenOn',
   'JIRA ID': 'jiraId',
-  'Estimated Effort Without AI (SP)': 'estimatedEffortWithoutAi',
-  'Actual Effort With AI (Hrs)': 'actualEffortWithAi',
-  'AI Used (Y/N)': 'aiUsed',
-  'Dev Start Date': 'devStartDate',
+  'Dev Start': 'devStartDate',
   'Dev End Date': 'devEndDate',
+  'Estimated Effort With AI (SP)': 'estimatedEffortWithAi',
   'Development Status': 'developmentStatus',
   'UAT Delivery Date': 'uatDeliveryDate',
-  'UAT Delivery Target': 'uatDeliveryTarget',
+  'UAT delivery target': 'uatDeliveryTarget',
   'Resources': 'resources',
-  'GO Live Planned Date': 'goLivePlannedDate',
+  'GO Live planned Date': 'goLivePlannedDate',
   'GO Live Date': 'goLiveDate',
   'Production Status': 'productionStatus',
   'Rollback (Y/N)': 'rollback',
   'Rollback Reason': 'rollbackReason',
+  'AI Used (Y/N)': 'aiUsed',
+  'Estimated Effort Without AI (Hrs)': 'estimatedEffortWithoutAi',
+  'Actual Effort With AI (Hrs)': 'actualEffortWithAi',
+  'Story Status': 'status',
   'Story Drop Reason': 'storyDropReason',
 };
 
@@ -167,12 +179,13 @@ export class UploadService implements IUploadService {
 
   /**
    * Validates that all required column headers are present.
-   * Reports which columns are missing.
+   * Reports which columns are missing. Uses trimmed comparison to handle
+   * trailing spaces in actual Excel headers.
    */
   validateColumns(headers: string[]): ValidationError[] {
     const normalizedHeaders = headers.map((h) => h.trim());
     const missingColumns = REQUIRED_COLUMNS.filter(
-      (col) => !normalizedHeaders.includes(col)
+      (col) => !normalizedHeaders.includes(col.trim())
     );
 
     if (missingColumns.length > 0) {
@@ -253,15 +266,20 @@ export class UploadService implements IUploadService {
     }
 
     // Step 3: Parse Excel buffer
-    const workbook = XLSX.read(buffer, { type: 'buffer' });
-    const firstSheetName = workbook.SheetNames[0];
-    if (!firstSheetName) {
+    const workbook = XLSX.read(buffer, { type: 'buffer', cellDates: false });
+
+    // Use Sheet2 if it exists (the actual data sheet), otherwise first sheet
+    const targetSheetName = workbook.SheetNames.includes('Sheet2')
+      ? 'Sheet2'
+      : workbook.SheetNames[0];
+
+    if (!targetSheetName) {
       throw new UploadValidationError([
         { field: 'file', message: 'Excel file contains no sheets.' },
       ]);
     }
 
-    const worksheet = workbook.Sheets[firstSheetName];
+    const worksheet = workbook.Sheets[targetSheetName];
     const rawData: Record<string, unknown>[] = XLSX.utils.sheet_to_json(worksheet, {
       defval: null,
     });
@@ -348,31 +366,32 @@ export class UploadService implements IUploadService {
 
     // Build SprintDataRow objects with portfolio derived from track
     const sprintDataRows: SprintDataRow[] = mappedRows.map((row) => {
-      const track = row.track as string;
+      const track = (row.track as string) || '';
       const portfolio = trackPortfolioMap[track] || track; // Fall back to track name if no mapping
 
       return {
         uploadId,
-        sno: row.sno as number,
-        team: row.team as string,
+        sno: (row.sno as number) ?? null,
+        team: (row.team as string) || '',
         track,
-        project: row.project as string,
+        project: (row.project as string) || '',
         portfolio,
         status: (row.status as string) ?? null,
         itemsList: (row.itemsList as string) ?? null,
-        walkthroughGivenOn: (row.walkthroughGivenOn as string) ?? null,
+        walkthroughGivenOn: (row.walkthroughGivenOn as string | number) ?? null,
         jiraId: row.jiraId as string,
+        estimatedEffortWithAi: (row.estimatedEffortWithAi as number) ?? null,
         estimatedEffortWithoutAi: (row.estimatedEffortWithoutAi as number) ?? null,
         actualEffortWithAi: (row.actualEffortWithAi as number) ?? null,
         aiUsed: (row.aiUsed as 'Y' | 'N') ?? null,
-        devStartDate: (row.devStartDate as string) ?? null,
-        devEndDate: (row.devEndDate as string) ?? null,
+        devStartDate: (row.devStartDate as string | number) ?? null,
+        devEndDate: (row.devEndDate as string | number) ?? null,
         developmentStatus: (row.developmentStatus as string) ?? null,
-        uatDeliveryDate: (row.uatDeliveryDate as string) ?? null,
-        uatDeliveryTarget: (row.uatDeliveryTarget as string) ?? null,
+        uatDeliveryDate: (row.uatDeliveryDate as string | number) ?? null,
+        uatDeliveryTarget: (row.uatDeliveryTarget as string | number) ?? null,
         resources: (row.resources as string) ?? null,
-        goLivePlannedDate: (row.goLivePlannedDate as string) ?? null,
-        goLiveDate: (row.goLiveDate as string) ?? null,
+        goLivePlannedDate: (row.goLivePlannedDate as string | number) ?? null,
+        goLiveDate: (row.goLiveDate as string | number) ?? null,
         productionStatus: (row.productionStatus as string) ?? null,
         rollback: (row.rollback as 'Y' | 'N') ?? null,
         rollbackReason: (row.rollbackReason as string) ?? null,
@@ -410,13 +429,32 @@ export class UploadService implements IUploadService {
 
   /**
    * Maps a raw Excel row (keyed by column header) to an object keyed by field names.
+   * Handles trailing spaces in Excel column headers by trimming keys during lookup.
+   * Derives 'team' and 'track' from 'project' since the actual Excel doesn't have
+   * separate TEAM/Track columns.
    */
   private mapRowToFields(row: Record<string, unknown>): Record<string, unknown> {
     const mapped: Record<string, unknown> = {};
+
+    // Create a trimmed-key lookup of the row data
+    const trimmedRow: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(row)) {
+      trimmedRow[key.trim()] = value;
+    }
+
     for (const [header, fieldName] of Object.entries(COLUMN_FIELD_MAP)) {
-      const value = row[header];
+      const value = trimmedRow[header.trim()];
       mapped[fieldName] = value === undefined ? null : value;
     }
+
+    // Derive 'team' and 'track' from 'project' (since Excel has no separate columns)
+    if (!mapped['team']) {
+      mapped['team'] = mapped['project'] ?? null;
+    }
+    if (!mapped['track']) {
+      mapped['track'] = mapped['project'] ?? null;
+    }
+
     return mapped;
   }
 

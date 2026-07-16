@@ -17,7 +17,7 @@ describe('seedDatabase', () => {
     closeDatabase();
   });
 
-  it('should seed users table with 4 mock users', async () => {
+  it('should seed users table with 5 mock users', async () => {
     await seedDatabase();
 
     const db = getDatabase();
@@ -26,29 +26,40 @@ describe('seedDatabase', () => {
       username: string;
       role: string;
       token: string;
+      team_id: string | null;
     }>;
 
-    expect(users).toHaveLength(4);
+    expect(users).toHaveLength(5);
 
-    const admin = users.find((u) => u.role === 'Admin');
+    const admin = users.find((u) => u.id === 'user-admin-001');
     expect(admin).toBeDefined();
-    expect(admin!.id).toBe('user-admin-001');
+    expect(admin!.role).toBe('Super_Admin');
     expect(admin!.username).toBe('admin');
+    expect(admin!.team_id).toBeNull();
 
     const em = users.find((u) => u.role === 'Engineering_Manager');
     expect(em).toBeDefined();
     expect(em!.id).toBe('user-em-001');
     expect(em!.username).toBe('eng_manager');
+    expect(em!.team_id).toBe('Savings SPA1');
 
     const dm = users.find((u) => u.role === 'Delivery_Manager');
     expect(dm).toBeDefined();
     expect(dm!.id).toBe('user-dm-001');
     expect(dm!.username).toBe('del_manager');
+    expect(dm!.team_id).toBeNull();
 
     const lead = users.find((u) => u.role === 'Leadership');
     expect(lead).toBeDefined();
     expect(lead!.id).toBe('user-lead-001');
     expect(lead!.username).toBe('leadership');
+    expect(lead!.team_id).toBeNull();
+
+    const superAdmin = users.find((u) => u.id === 'user-sa-001');
+    expect(superAdmin).toBeDefined();
+    expect(superAdmin!.role).toBe('Super_Admin');
+    expect(superAdmin!.username).toBe('super_admin');
+    expect(superAdmin!.team_id).toBeNull();
   });
 
   it('should generate valid JWT tokens for each user', async () => {
@@ -69,7 +80,7 @@ describe('seedDatabase', () => {
     }
   });
 
-  it('should seed track_portfolio_mapping with 6 entries', async () => {
+  it('should seed track_portfolio_mapping with 17 entries', async () => {
     await seedDatabase();
 
     const db = getDatabase();
@@ -78,14 +89,20 @@ describe('seedDatabase', () => {
       portfolio: string;
     }>;
 
-    expect(mappings).toHaveLength(6);
+    expect(mappings).toHaveLength(17);
 
-    const expectedTracks = ['IBPS-POS', 'IBPS-Dolphin', 'IBPS-Claims', 'mPro', 'E-Commerce', 'POSV/IVC'];
-    for (const track of expectedTracks) {
+    // Verify original spec portfolios
+    const expectedOriginalTracks = ['IBPS-POS', 'IBPS-Dolphin', 'IBPS-Claims', 'mPro', 'E-Commerce', 'POSV/IVC'];
+    for (const track of expectedOriginalTracks) {
       const mapping = mappings.find((m) => m.track === track);
       expect(mapping).toBeDefined();
       expect(mapping!.portfolio).toBe(track);
     }
+
+    // Verify actual project mappings from Excel
+    const savingsMapping = mappings.find((m) => m.track === 'Savings SPA1');
+    expect(savingsMapping).toBeDefined();
+    expect(savingsMapping!.portfolio).toBe('Savings');
   });
 
   it('should seed rag_thresholds with 9 KPI thresholds', async () => {
@@ -131,8 +148,8 @@ describe('seedDatabase', () => {
     const mappingCount = db.prepare('SELECT COUNT(*) as count FROM track_portfolio_mapping').get() as { count: number };
     const thresholdCount = db.prepare('SELECT COUNT(*) as count FROM rag_thresholds').get() as { count: number };
 
-    expect(userCount.count).toBe(4);
-    expect(mappingCount.count).toBe(6);
+    expect(userCount.count).toBe(5);
+    expect(mappingCount.count).toBe(17);
     expect(thresholdCount.count).toBe(9);
   });
 

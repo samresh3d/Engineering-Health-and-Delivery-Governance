@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import Database from 'better-sqlite3';
 import { SprintDataRepository } from '../../repositories/sprint-data.repository.js';
-import type { SprintDataRow, KpiFilter } from '../../types/index.js';
+import type { SprintDataRow, KpiFilter, SprintDataRowExtended } from '../../types/index.js';
 
 function createInMemoryDb(): Database.Database {
   const db = new Database(':memory:');
@@ -22,7 +22,7 @@ function createInMemoryDb(): Database.Database {
     CREATE TABLE sprint_data (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       upload_id TEXT NOT NULL REFERENCES uploads(id),
-      sno INTEGER NOT NULL,
+      sno INTEGER,
       team TEXT NOT NULL,
       track TEXT NOT NULL,
       project TEXT NOT NULL,
@@ -31,6 +31,7 @@ function createInMemoryDb(): Database.Database {
       items_list TEXT,
       walkthrough_given_on TEXT,
       jira_id TEXT NOT NULL,
+      estimated_effort_with_ai REAL,
       estimated_effort_without_ai REAL,
       actual_effort_with_ai REAL,
       ai_used TEXT CHECK(ai_used IN ('Y', 'N')),
@@ -47,6 +48,16 @@ function createInMemoryDb(): Database.Database {
       rollback_reason TEXT,
       story_drop_reason TEXT,
       ingested_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+      function_name TEXT NOT NULL DEFAULT 'Unassigned',
+      story_name TEXT,
+      actual_effort REAL,
+      definition_of_ready TEXT CHECK(definition_of_ready IN ('Y','N')),
+      definition_of_done TEXT CHECK(definition_of_done IN ('Y','N')),
+      refinement_closure_date TEXT,
+      uat_start_date TEXT,
+      uat_complete_date TEXT,
+      delay_reason TEXT,
+      delay_reason_description TEXT,
       UNIQUE(jira_id, team)
     );
 
@@ -55,6 +66,8 @@ function createInMemoryDb(): Database.Database {
     CREATE INDEX idx_sprint_data_project ON sprint_data(project);
     CREATE INDEX idx_sprint_data_dev_start ON sprint_data(dev_start_date);
     CREATE INDEX idx_sprint_data_jira_team ON sprint_data(jira_id, team);
+    CREATE INDEX idx_sprint_data_function ON sprint_data(function_name);
+    CREATE INDEX idx_sprint_data_function_team ON sprint_data(function_name, team);
   `);
 
   return db;
@@ -67,7 +80,7 @@ function createUpload(db: Database.Database, uploadId: string): void {
   ).run({ id: uploadId });
 }
 
-function makeRow(overrides: Partial<SprintDataRow> = {}): SprintDataRow {
+function makeRow(overrides: Partial<SprintDataRowExtended> = {}): SprintDataRowExtended {
   return {
     uploadId: 'upload-1',
     sno: 1,
@@ -79,6 +92,7 @@ function makeRow(overrides: Partial<SprintDataRow> = {}): SprintDataRow {
     itemsList: 'Item 1',
     walkthroughGivenOn: '2024-01-10',
     jiraId: 'PROJ-100',
+    estimatedEffortWithAi: null,
     estimatedEffortWithoutAi: 8,
     actualEffortWithAi: 6,
     aiUsed: 'Y',
@@ -95,6 +109,16 @@ function makeRow(overrides: Partial<SprintDataRow> = {}): SprintDataRow {
     rollbackReason: null,
     storyDropReason: null,
     ingestedAt: '2024-01-15T10:00:00Z',
+    functionName: 'E-Com',
+    storyName: 'User Login Story',
+    actualEffort: 12.5,
+    definitionOfReady: 'Y',
+    definitionOfDone: 'N',
+    refinementClosureDate: '2024-01-08',
+    uatStartDate: '2024-01-21',
+    uatCompleteDate: '2024-01-23',
+    delayReason: 'Dependency on other team',
+    delayReasonDescription: 'Waiting for API team to complete integration endpoint',
     ...overrides,
   };
 }
@@ -216,6 +240,154 @@ describe('SprintDataRepository', () => {
       expect(result!.estimatedEffortWithoutAi).toBeNull();
       expect(result!.aiUsed).toBeNull();
       expect(result!.rollback).toBeNull();
+    });
+
+    it('should persist all extended fields (function_name, story_name, etc.)', async () => {
+      const row = makeRow({
+        jiraId: 'PROJ-550',
+        functionName: 'MPro',
+        storyName: 'Payment Integration',
+        actualEffort: 24.5,
+        definitionOfReady: 'Y',
+        definitionOfDone: 'N',
+        refinementClosureDate: '2024-01-05',
+        uatStartDate: '2024-01-20',
+        uatCompleteDate: '2024-01-22',
+        delayReason: 'Technical complexity',
+        delayReasonDescription: 'Complex third-party API integration required additional research',
+      });
+
+      await repo.bulkUpsert([row], uploadId);
+      const result = await repo.findByJiraIdAndTeam('PROJ-550', 'Team Alpha');
+
+      expect(result).not.toBeNull();
+      expect(result!.functionName).toBe('MPro');
+      expect(result!.storyName).toBe('Payment Integration');
+      expect(result!.actualEffort).toBe(24.5);
+      expect(result!.definitionOfReady).toBe('Y');
+      expect(result!.definitionOfDone).toBe('N');
+      expect(result!.refinementClosureDate).toBe('2024-01-05');
+      expect(result!.uatStartDate).toBe('2024-01-20');
+      expect(result!.uatCompleteDate).toBe('2024-01-22');
+      expect(result!.delayReason).toBe('Technical complexity');
+      expect(result!.delayReasonDescription).toBe('Complex third-party API integration required additional research');
+    });
+
+    it('should handle nullable extended fields correctly', async () => {
+      const row = makeRow({
+        jiraId: 'PROJ-551',
+        functionName: 'E-Com',
+        storyName: null,
+        actualEffort: null,
+        definitionOfReady: null,
+        definitionOfDone: null,
+        refinementClosureDate: null,
+        uatStartDate: null,
+        uatCompleteDate: null,
+        delayReason: null,
+        delayReasonDescription: null,
+      });
+
+      await repo.bulkUpsert([row], uploadId);
+      const result = await repo.findByJiraIdAndTeam('PROJ-551', 'Team Alpha');
+
+      expect(result).not.toBeNull();
+      expect(result!.functionName).toBe('E-Com');
+      expect(result!.storyName).toBeNull();
+      expect(result!.actualEffort).toBeNull();
+      expect(result!.definitionOfReady).toBeNull();
+      expect(result!.definitionOfDone).toBeNull();
+      expect(result!.refinementClosureDate).toBeNull();
+      expect(result!.uatStartDate).toBeNull();
+      expect(result!.uatCompleteDate).toBeNull();
+      expect(result!.delayReason).toBeNull();
+      expect(result!.delayReasonDescription).toBeNull();
+    });
+
+    it('should default function_name to Unassigned when not provided', async () => {
+      // Use a base SprintDataRow without extended fields
+      const baseRow: SprintDataRow = {
+        uploadId: 'upload-1',
+        sno: 1,
+        team: 'Team Alpha',
+        track: 'IBPS-POS',
+        project: 'Project X',
+        portfolio: 'IBPS-POS',
+        status: 'In Progress',
+        itemsList: 'Item 1',
+        walkthroughGivenOn: '2024-01-10',
+        jiraId: 'PROJ-552',
+        estimatedEffortWithAi: null,
+        estimatedEffortWithoutAi: 8,
+        actualEffortWithAi: 6,
+        aiUsed: 'Y',
+        devStartDate: '2024-01-15',
+        devEndDate: '2024-01-20',
+        developmentStatus: 'Complete',
+        uatDeliveryDate: '2024-01-22',
+        uatDeliveryTarget: '2024-01-25',
+        resources: 'Dev1',
+        goLivePlannedDate: '2024-01-28',
+        goLiveDate: '2024-01-28',
+        productionStatus: 'Live',
+        rollback: 'N',
+        rollbackReason: null,
+        storyDropReason: null,
+        ingestedAt: '2024-01-15T10:00:00Z',
+      };
+
+      await repo.bulkUpsert([baseRow], uploadId);
+      const result = await repo.findByJiraIdAndTeam('PROJ-552', 'Team Alpha');
+
+      expect(result).not.toBeNull();
+      expect(result!.functionName).toBe('Unassigned');
+      expect(result!.storyName).toBeNull();
+      expect(result!.actualEffort).toBeNull();
+    });
+
+    it('should reject invalid definition_of_ready values via CHECK constraint', async () => {
+      const row = makeRow({
+        jiraId: 'PROJ-553',
+        definitionOfReady: 'INVALID' as any,
+      });
+
+      await expect(repo.bulkUpsert([row], uploadId)).rejects.toThrow();
+    });
+
+    it('should reject invalid definition_of_done values via CHECK constraint', async () => {
+      const row = makeRow({
+        jiraId: 'PROJ-554',
+        definitionOfDone: 'INVALID' as any,
+      });
+
+      await expect(repo.bulkUpsert([row], uploadId)).rejects.toThrow();
+    });
+
+    it('should update extended fields on upsert (jira_id + team conflict)', async () => {
+      const row1 = makeRow({
+        jiraId: 'PROJ-555',
+        functionName: 'E-Com',
+        storyName: 'Original Story',
+        actualEffort: 10,
+        definitionOfReady: 'N',
+      });
+      await repo.bulkUpsert([row1], uploadId);
+
+      const row2 = makeRow({
+        jiraId: 'PROJ-555',
+        functionName: 'MPro',
+        storyName: 'Updated Story',
+        actualEffort: 20,
+        definitionOfReady: 'Y',
+      });
+      await repo.bulkUpsert([row2], uploadId);
+
+      const result = await repo.findByJiraIdAndTeam('PROJ-555', 'Team Alpha');
+      expect(result).not.toBeNull();
+      expect(result!.functionName).toBe('MPro');
+      expect(result!.storyName).toBe('Updated Story');
+      expect(result!.actualEffort).toBe(20);
+      expect(result!.definitionOfReady).toBe('Y');
     });
   });
 

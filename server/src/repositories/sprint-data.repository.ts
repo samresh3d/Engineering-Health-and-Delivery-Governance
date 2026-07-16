@@ -1,18 +1,19 @@
 import type Database from 'better-sqlite3';
-import type { SprintDataRow, KpiFilter } from '../types/index.js';
+import type { SprintDataRow, KpiFilter, SprintDataRowExtended } from '../types/index.js';
 import type { ISprintDataRepository } from './interfaces.js';
 import { getDatabase } from '../database/connection.js';
 
 const MAX_ROWS_PER_UPLOAD = 10_000;
 
 /**
- * Maps a database row (snake_case) to a SprintDataRow (camelCase).
+ * Maps a database row (snake_case) to a SprintDataRowExtended (camelCase).
+ * Returns all 29+ fields including the new hierarchy and delivery tracking fields.
  */
-function mapRowToSprintData(row: Record<string, unknown>): SprintDataRow {
+function mapRowToSprintData(row: Record<string, unknown>): SprintDataRowExtended {
   return {
     id: row.id as number,
     uploadId: row.upload_id as string,
-    sno: row.sno as number,
+    sno: (row.sno as number) ?? null,
     team: row.team as string,
     track: row.track as string,
     project: row.project as string,
@@ -21,6 +22,7 @@ function mapRowToSprintData(row: Record<string, unknown>): SprintDataRow {
     itemsList: (row.items_list as string) ?? null,
     walkthroughGivenOn: (row.walkthrough_given_on as string) ?? null,
     jiraId: row.jira_id as string,
+    estimatedEffortWithAi: (row.estimated_effort_with_ai as number) ?? null,
     estimatedEffortWithoutAi: (row.estimated_effort_without_ai as number) ?? null,
     actualEffortWithAi: (row.actual_effort_with_ai as number) ?? null,
     aiUsed: (row.ai_used as 'Y' | 'N') ?? null,
@@ -37,6 +39,17 @@ function mapRowToSprintData(row: Record<string, unknown>): SprintDataRow {
     rollbackReason: (row.rollback_reason as string) ?? null,
     storyDropReason: (row.story_drop_reason as string) ?? null,
     ingestedAt: row.ingested_at as string,
+    // New hierarchy and delivery tracking fields
+    functionName: (row.function_name as string) ?? 'Unassigned',
+    storyName: (row.story_name as string) ?? null,
+    actualEffort: (row.actual_effort as number) ?? null,
+    definitionOfReady: (row.definition_of_ready as 'Y' | 'N') ?? null,
+    definitionOfDone: (row.definition_of_done as 'Y' | 'N') ?? null,
+    refinementClosureDate: (row.refinement_closure_date as string) ?? null,
+    uatStartDate: (row.uat_start_date as string) ?? null,
+    uatCompleteDate: (row.uat_complete_date as string) ?? null,
+    delayReason: (row.delay_reason as string) ?? null,
+    delayReasonDescription: (row.delay_reason_description as string) ?? null,
   };
 }
 
@@ -53,9 +66,12 @@ export class SprintDataRepository implements ISprintDataRepository {
   /**
    * Bulk upsert sprint data rows within a transaction.
    * Uses INSERT OR REPLACE on UNIQUE(jira_id, team) constraint.
+   * Persists all 29 fields including function_name, story_name, actual_effort,
+   * DOR, DOD, refinement_closure_date, uat_start_date, uat_complete_date,
+   * delay_reason, and delay_reason_description.
    * Rejects with error if rows exceed 10,000 limit.
    */
-  async bulkUpsert(rows: SprintDataRow[], uploadId: string): Promise<number> {
+  async bulkUpsert(rows: (SprintDataRow | SprintDataRowExtended)[], uploadId: string): Promise<number> {
     if (rows.length > MAX_ROWS_PER_UPLOAD) {
       throw new Error(
         `Row limit exceeded: received ${rows.length} rows, maximum allowed is ${MAX_ROWS_PER_UPLOAD}`
@@ -70,25 +86,34 @@ export class SprintDataRepository implements ISprintDataRepository {
       INSERT OR REPLACE INTO sprint_data (
         upload_id, sno, team, track, project, portfolio,
         status, items_list, walkthrough_given_on, jira_id,
-        estimated_effort_without_ai, actual_effort_with_ai, ai_used,
+        estimated_effort_with_ai, estimated_effort_without_ai, actual_effort_with_ai, ai_used,
         dev_start_date, dev_end_date, development_status,
         uat_delivery_date, uat_delivery_target, resources,
         go_live_planned_date, go_live_date, production_status,
-        rollback, rollback_reason, story_drop_reason, ingested_at
+        rollback, rollback_reason, story_drop_reason, ingested_at,
+        function_name, story_name, actual_effort,
+        definition_of_ready, definition_of_done,
+        refinement_closure_date, uat_start_date, uat_complete_date,
+        delay_reason, delay_reason_description
       ) VALUES (
         @uploadId, @sno, @team, @track, @project, @portfolio,
         @status, @itemsList, @walkthroughGivenOn, @jiraId,
-        @estimatedEffortWithoutAi, @actualEffortWithAi, @aiUsed,
+        @estimatedEffortWithAi, @estimatedEffortWithoutAi, @actualEffortWithAi, @aiUsed,
         @devStartDate, @devEndDate, @developmentStatus,
         @uatDeliveryDate, @uatDeliveryTarget, @resources,
         @goLivePlannedDate, @goLiveDate, @productionStatus,
-        @rollback, @rollbackReason, @storyDropReason, @ingestedAt
+        @rollback, @rollbackReason, @storyDropReason, @ingestedAt,
+        @functionName, @storyName, @actualEffort,
+        @definitionOfReady, @definitionOfDone,
+        @refinementClosureDate, @uatStartDate, @uatCompleteDate,
+        @delayReason, @delayReasonDescription
       )
     `);
 
-    const upsertAll = this.db.transaction((dataRows: SprintDataRow[]) => {
+    const upsertAll = this.db.transaction((dataRows: (SprintDataRow | SprintDataRowExtended)[]) => {
       let count = 0;
       for (const row of dataRows) {
+        const extRow = row as Partial<SprintDataRowExtended>;
         insertStmt.run({
           uploadId: uploadId,
           sno: row.sno,
@@ -100,6 +125,7 @@ export class SprintDataRepository implements ISprintDataRepository {
           itemsList: row.itemsList,
           walkthroughGivenOn: row.walkthroughGivenOn,
           jiraId: row.jiraId,
+          estimatedEffortWithAi: row.estimatedEffortWithAi,
           estimatedEffortWithoutAi: row.estimatedEffortWithoutAi,
           actualEffortWithAi: row.actualEffortWithAi,
           aiUsed: row.aiUsed,
@@ -116,6 +142,16 @@ export class SprintDataRepository implements ISprintDataRepository {
           rollbackReason: row.rollbackReason,
           storyDropReason: row.storyDropReason,
           ingestedAt: row.ingestedAt,
+          functionName: extRow.functionName ?? 'Unassigned',
+          storyName: extRow.storyName ?? null,
+          actualEffort: extRow.actualEffort ?? null,
+          definitionOfReady: extRow.definitionOfReady ?? null,
+          definitionOfDone: extRow.definitionOfDone ?? null,
+          refinementClosureDate: extRow.refinementClosureDate ?? null,
+          uatStartDate: extRow.uatStartDate ?? null,
+          uatCompleteDate: extRow.uatCompleteDate ?? null,
+          delayReason: extRow.delayReason ?? null,
+          delayReasonDescription: extRow.delayReasonDescription ?? null,
         });
         count++;
       }
@@ -129,10 +165,17 @@ export class SprintDataRepository implements ISprintDataRepository {
    * Find sprint data rows matching the provided filter.
    * Builds WHERE clauses dynamically based on which filter fields are provided.
    * Date range filtering applies to dev_start_date.
+   * Supports filtering by functionName (Function only), functionName+team (Function+Team),
+   * or all data when no functionName is provided.
    */
-  async findByFilter(filter: KpiFilter): Promise<SprintDataRow[]> {
+  async findByFilter(filter: KpiFilter): Promise<SprintDataRowExtended[]> {
     const conditions: string[] = [];
     const params: Record<string, string> = {};
+
+    if (filter.functionName) {
+      conditions.push('function_name = @functionName');
+      params.functionName = filter.functionName;
+    }
 
     if (filter.team) {
       conditions.push('team = @team');
@@ -173,7 +216,7 @@ export class SprintDataRepository implements ISprintDataRepository {
   /**
    * Find a single sprint data row by JIRA ID and team.
    */
-  async findByJiraIdAndTeam(jiraId: string, team: string): Promise<SprintDataRow | null> {
+  async findByJiraIdAndTeam(jiraId: string, team: string): Promise<SprintDataRowExtended | null> {
     const stmt = this.db.prepare(
       'SELECT * FROM sprint_data WHERE jira_id = @jiraId AND team = @team'
     );

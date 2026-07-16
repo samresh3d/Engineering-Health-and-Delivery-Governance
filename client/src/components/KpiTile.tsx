@@ -1,5 +1,6 @@
 import type { KpiName, RagStatus } from '../types';
 import RagBadge from './RagBadge';
+import { colors, theme } from '../theme';
 
 export interface KpiTileProps {
   kpiName: KpiName;
@@ -44,12 +45,11 @@ function formatPercentChange(percentChange: number | null): string {
   if (percentChange === null) return '—';
   if (percentChange > 0) return `↑ ${percentChange}%`;
   if (percentChange < 0) return `↓ ${Math.abs(percentChange)}%`;
-  return `0%`;
+  return '→ 0%';
 }
 
 /**
- * KPI tile component displaying the KPI name, current value,
- * RAG status badge, and percentage change indicator.
+ * KPI tile — card displaying a single KPI with platform styling.
  */
 export default function KpiTile({
   kpiName,
@@ -63,41 +63,63 @@ export default function KpiTile({
   return (
     <div
       style={{
-        border: '1px solid #E0E0E0',
-        borderRadius: '8px',
-        padding: '16px',
-        backgroundColor: '#FFFFFF',
+        background: colors.background,
+        border: `1px solid ${colors.border}`,
+        borderRadius: theme.borderRadius.md,
+        padding: '20px',
         display: 'flex',
         flexDirection: 'column',
-        gap: '8px',
+        gap: '12px',
+        boxShadow: theme.shadows.card,
+        transition: 'box-shadow 0.2s, transform 0.2s',
+      }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.boxShadow = theme.shadows.hover;
+        e.currentTarget.style.transform = 'translateY(-2px)';
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.boxShadow = theme.shadows.card;
+        e.currentTarget.style.transform = 'translateY(0)';
       }}
     >
-      <div style={{ fontSize: '14px', color: '#666666', fontWeight: 500 }}>
-        {KPI_LABELS[kpiName]}
+      {/* KPI Label */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <span style={{ fontSize: '13px', fontWeight: 500, color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+          {KPI_LABELS[kpiName]}
+        </span>
+        <RagBadge status={ragStatus} />
       </div>
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+      {/* Value */}
+      <div>
         {showNoData ? (
-          <span style={{ fontSize: '18px', color: '#999999' }}>
+          <span style={{ fontSize: '16px', color: '#B0B0B0', fontStyle: 'italic' }}>
             No data available
           </span>
         ) : (
-          <>
-            <span style={{ fontSize: '24px', fontWeight: 700, color: '#333333' }}>
-              {formatValue(kpiName, value)}
-            </span>
-            <RagBadge status={ragStatus} />
-          </>
+          <span style={{ fontSize: '28px', fontWeight: 700, color: colors.text }}>
+            {formatValue(kpiName, value)}
+          </span>
         )}
       </div>
 
+      {/* Percent change */}
       <div
         style={{
           fontSize: '12px',
-          color: percentChange !== null && percentChange > 0 ? '#28A745' : percentChange !== null && percentChange < 0 ? '#DC3545' : '#666666',
+          fontWeight: 500,
+          color: percentChange !== null && percentChange > 0 ? colors.green
+            : percentChange !== null && percentChange < 0 ? colors.red
+            : colors.textSecondary,
+          display: 'flex',
+          alignItems: 'center',
+          gap: '4px',
         }}
       >
-        {formatPercentChange(percentChange)}
+        <span>{formatPercentChange(percentChange)}</span>
+        {percentChange !== null && (
+          <span style={{ color: colors.textSecondary, fontWeight: 400 }}>vs prev period</span>
+        )}
       </div>
     </div>
   );
