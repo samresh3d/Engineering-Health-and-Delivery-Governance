@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { getStoredToken } from '../../auth';
 import { colors, theme } from '../../theme';
+import { API_BASE_URL } from '../../config';
 
 /** Sprint data entry as returned by the API */
 interface SprintDataEntry {
@@ -89,7 +90,7 @@ export default function AdminEntries() {
     try {
       const token = getStoredToken();
       const response = await fetch(
-        `http://localhost:3000/api/admin/entries?limit=${PAGE_SIZE}&offset=${offset}&sort=${sort}`,
+        `${API_BASE_URL}/api/admin/entries?limit=${PAGE_SIZE}&offset=${offset}&sort=${sort}`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -171,7 +172,7 @@ export default function AdminEntries() {
     setError(null);
     try {
       const token = getStoredToken();
-      const response = await fetch(`http://localhost:3000/api/admin/entries/${id}`, {
+      const response = await fetch(`${API_BASE_URL}/api/admin/entries/${id}`, {
         method: 'PUT',
         headers: {
           Authorization: `Bearer ${token}`,
@@ -213,7 +214,7 @@ export default function AdminEntries() {
     try {
       const token = getStoredToken();
       const response = await fetch(
-        `http://localhost:3000/api/admin/entries/${deleteTarget.id}`,
+        `${API_BASE_URL}/api/admin/entries/${deleteTarget.id}`,
         {
           method: 'DELETE',
           headers: {
@@ -253,7 +254,7 @@ export default function AdminEntries() {
     setError(null);
     try {
       const token = getStoredToken();
-      const response = await fetch('http://localhost:3000/api/admin/entries', {
+      const response = await fetch(`${API_BASE_URL}/api/admin/entries`, {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${token}`,

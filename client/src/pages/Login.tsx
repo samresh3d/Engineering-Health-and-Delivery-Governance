@@ -4,6 +4,7 @@ import { setAuth, fetchAndUpdateUserProfile } from '../auth';
 import { colors, theme } from '../theme';
 import logo from '../logo.svg';
 import apiClient from '../api/client';
+import { API_BASE_URL } from '../config';
 
 type RoleOption = 'Super_Admin' | 'Leadership' | 'Engineering_Manager';
 
@@ -25,7 +26,7 @@ export default function Login() {
   useEffect(() => {
     if (role === 'Engineering_Manager') {
       setLoading(true);
-      fetch('http://localhost:3000/api/auth/functions')
+      fetch(`${API_BASE_URL}/api/auth/functions`)
         .then(res => res.json())
         .then(data => {
           setFunctions(data.functions || []);

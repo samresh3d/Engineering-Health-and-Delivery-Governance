@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { getStoredToken } from '../../auth';
 import { colors, theme } from '../../theme';
+import { API_BASE_URL } from '../../config';
 
 interface SprintDataEntry {
   id: number;
@@ -51,7 +52,7 @@ export default function AdminTeamDetail() {
     if (!teamName) return;
 
     const token = getStoredToken();
-    const url = `http://localhost:3000/api/admin/teams/${encodeURIComponent(teamName)}`;
+    const url = `${API_BASE_URL}/api/admin/teams/${encodeURIComponent(teamName)}`;
 
     setLoading(true);
     fetch(url, {

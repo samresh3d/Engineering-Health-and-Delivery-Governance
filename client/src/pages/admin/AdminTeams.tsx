@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getStoredToken } from '../../auth';
 import { colors, theme } from '../../theme';
+import { API_BASE_URL } from '../../config';
 
 interface TeamSummary {
   team: string;
@@ -23,7 +24,7 @@ export default function AdminTeams() {
     if (search) params.set('search', search);
     if (portfolioFilter) params.set('portfolio', portfolioFilter);
 
-    const url = `http://localhost:3000/api/admin/teams?${params.toString()}`;
+    const url = `${API_BASE_URL}/api/admin/teams?${params.toString()}`;
 
     setLoading(true);
     fetch(url, {
