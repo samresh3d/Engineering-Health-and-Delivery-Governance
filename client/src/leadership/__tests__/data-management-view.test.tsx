@@ -113,7 +113,7 @@ describe('DataManagementView', () => {
 
     // The clear-filters affordance is present (Req 7.4 hook).
     expect(
-      within(filterBar).getByRole('button', { name: /clear filters/i })
+      within(filterBar).getByRole('button', { name: /clear all/i })
     ).toBeInTheDocument();
   });
 });
