@@ -32,6 +32,7 @@ import {
   type IExportService,
 } from '../services/export-service';
 import type { FilteredDataset, KpiDefinition } from '../model/types';
+import { dash } from '../theme';
 
 /** The id used for the injected print stylesheet (injected once). */
 const PRINT_STYLE_ID = 'leadership-print-styles';
@@ -362,6 +363,7 @@ export default function ExportControls({
           disabled={!canExportData || busy !== null}
           aria-busy={busy === 'excel'}
           data-testid="export-excel"
+          style={exportBtnStyle(!canExportData || busy !== null)}
         >
           {busy === 'excel' ? 'Exporting…' : 'Export Excel'}
         </button>
@@ -371,6 +373,7 @@ export default function ExportControls({
           disabled={!canExportDom || busy !== null}
           aria-busy={busy === 'pdf'}
           data-testid="export-pdf"
+          style={exportBtnStyle(!canExportDom || busy !== null)}
         >
           {busy === 'pdf' ? 'Exporting…' : 'Export PDF'}
         </button>
@@ -380,6 +383,7 @@ export default function ExportControls({
           disabled={!canExportChart || busy !== null}
           aria-busy={busy === 'png'}
           data-testid="export-png"
+          style={exportBtnStyle(!canExportChart || busy !== null)}
         >
           {busy === 'png' ? 'Exporting…' : 'Export PNG'}
         </button>
@@ -389,6 +393,7 @@ export default function ExportControls({
           disabled={busy !== null}
           aria-busy={busy === 'print'}
           data-testid="print-report"
+          style={exportBtnStyle(busy !== null)}
         >
           Print
         </button>
@@ -423,6 +428,22 @@ const toolbarStyle: React.CSSProperties = {
   flexWrap: 'wrap',
 };
 
+/** Dark, theme-consistent styling for the export/print toolbar buttons. */
+function exportBtnStyle(disabled: boolean): React.CSSProperties {
+  return {
+    background: dash.panelBg,
+    color: disabled ? dash.textFaint : dash.text,
+    border: `1px solid ${dash.border}`,
+    borderRadius: 8,
+    padding: '7px 12px',
+    fontSize: 12.5,
+    fontWeight: 600,
+    cursor: disabled ? 'not-allowed' : 'pointer',
+    opacity: disabled ? 0.55 : 1,
+    whiteSpace: 'nowrap',
+  };
+}
+
 const notificationStyle: React.CSSProperties = {
   display: 'flex',
   alignItems: 'center',
@@ -430,10 +451,10 @@ const notificationStyle: React.CSSProperties = {
   gap: 12,
   marginTop: 8,
   padding: '8px 12px',
-  borderRadius: 6,
-  border: '1px solid #F5C2C7',
-  background: '#F8D7DA',
-  color: '#842029',
+  borderRadius: 8,
+  border: `1px solid ${dash.red}55`,
+  background: `${dash.red}1A`,
+  color: dash.red,
   fontSize: 13,
 };
 

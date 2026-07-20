@@ -38,23 +38,28 @@ const DATA_SOURCES = ['Jira', 'Sustain Report', 'Dynatrace', 'AWS Cost'];
 function SidebarLink({
   item,
   active,
+  collapsed,
   onClick,
 }: {
   item: { key: NavKey; label: string; icon: string };
   active: boolean;
+  collapsed: boolean;
   onClick: () => void;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
+      title={collapsed ? item.label : undefined}
+      aria-label={item.label}
       style={{
         display: 'flex',
         alignItems: 'center',
         gap: 10,
         width: '100%',
         textAlign: 'left',
-        padding: '10px 14px',
+        padding: collapsed ? '10px 0' : '10px 14px',
+        justifyContent: collapsed ? 'center' : 'flex-start',
         borderRadius: 8,
         border: 'none',
         cursor: 'pointer',
@@ -62,10 +67,12 @@ function SidebarLink({
         fontWeight: 600,
         color: active ? dash.textStrong : dash.textMuted,
         background: active ? dash.primary : 'transparent',
+        whiteSpace: 'nowrap',
+        overflow: 'hidden',
       }}
     >
-      <span aria-hidden style={{ width: 18, textAlign: 'center' }}>{item.icon}</span>
-      {item.label}
+      <span aria-hidden style={{ width: 18, textAlign: 'center', flexShrink: 0 }}>{item.icon}</span>
+      {!collapsed && item.label}
     </button>
   );
 }
@@ -161,6 +168,8 @@ function LegacyView({ children }: { children: React.ReactNode }) {
 function LeadershipShell(): React.ReactElement {
   const { model, status } = useLeadership();
   const [nav, setNav] = useState<NavKey>('overview');
+  // Sidebar starts collapsed (icon-only rail); expands on click.
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const printableRef = useRef<HTMLElement | null>(null);
 
   const hasWorkbook = model !== null;
@@ -189,26 +198,80 @@ function LeadershipShell(): React.ReactElement {
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh', background: dash.appBg, color: dash.text, fontFamily: 'Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif' }}>
-      {/* Sidebar */}
-      <aside style={{ width: 232, flexShrink: 0, background: dash.sidebarBg, borderRight: `1px solid ${dash.border}`, padding: 16, display: 'flex', flexDirection: 'column', gap: 6 }} className="leadership-no-print">
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '4px 8px 16px' }}>
-          <span style={{ width: 30, height: 30, borderRadius: 8, background: dash.primary, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800 }}>E</span>
-          <div style={{ lineHeight: 1.1 }}>
-            <div style={{ fontSize: 14, fontWeight: 700, color: dash.textStrong }}>Engineering Performance</div>
-            <div style={{ fontSize: 11, color: dash.textFaint }}>Team Dashboard</div>
-          </div>
-        </div>
-        {NAV_ITEMS.map((item) => (
-          <SidebarLink key={item.key} item={item} active={nav === item.key} onClick={() => setNav(item.key)} />
-        ))}
-        <div style={{ marginTop: 'auto', paddingTop: 16 }}>
-          <div style={{ fontSize: 10.5, color: dash.textFaint, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5, padding: '0 8px 8px' }}>Data Source</div>
-          {DATA_SOURCES.map((s) => (
-            <div key={s} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 8px', fontSize: 12.5, color: dash.textMuted }}>
-              <span style={{ width: 7, height: 7, borderRadius: '50%', background: dash.green }} /> {s}
+      {/* Dark, theme-consistent scrollbars for scrollable areas in the module. */}
+      <style>{`
+        .ld-scroll { scrollbar-width: thin; scrollbar-color: ${dash.border} transparent; }
+        .ld-scroll::-webkit-scrollbar { width: 8px; height: 8px; }
+        .ld-scroll::-webkit-scrollbar-track { background: transparent; }
+        .ld-scroll::-webkit-scrollbar-thumb { background: ${dash.border}; border-radius: 6px; }
+        .ld-scroll::-webkit-scrollbar-thumb:hover { background: ${dash.textFaint}; }
+        .ld-scroll::-webkit-scrollbar-corner { background: transparent; }
+      `}</style>
+      {/* Sidebar (collapsible: icon-only rail by default) */}
+      <aside
+        style={{
+          width: sidebarOpen ? 232 : 64,
+          flexShrink: 0,
+          background: dash.sidebarBg,
+          borderRight: `1px solid ${dash.border}`,
+          padding: sidebarOpen ? 16 : '16px 10px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 6,
+          transition: 'width 160ms ease, padding 160ms ease',
+        }}
+        className="leadership-no-print"
+      >
+        {/* Brand + collapse/expand toggle */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: sidebarOpen ? 'space-between' : 'center', gap: 8, padding: sidebarOpen ? '4px 8px 12px' : '4px 0 12px' }}>
+          {sidebarOpen && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+              <span style={{ width: 30, height: 30, borderRadius: 8, background: dash.primary, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, flexShrink: 0 }}>E</span>
+              <div style={{ lineHeight: 1.1, overflow: 'hidden' }}>
+                <div style={{ fontSize: 14, fontWeight: 700, color: dash.textStrong, whiteSpace: 'nowrap' }}>Engineering Performance</div>
+                <div style={{ fontSize: 11, color: dash.textFaint }}>Team Dashboard</div>
+              </div>
             </div>
-          ))}
+          )}
+          <button
+            type="button"
+            onClick={() => setSidebarOpen((v) => !v)}
+            aria-label={sidebarOpen ? 'Collapse sidebar' : 'Expand sidebar'}
+            aria-expanded={sidebarOpen}
+            title={sidebarOpen ? 'Collapse' : 'Expand'}
+            style={{
+              width: 32,
+              height: 32,
+              borderRadius: 8,
+              border: `1px solid ${dash.border}`,
+              background: dash.panelBg,
+              color: dash.textMuted,
+              cursor: 'pointer',
+              fontSize: 15,
+              flexShrink: 0,
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            {sidebarOpen ? '«' : '☰'}
+          </button>
         </div>
+
+        {NAV_ITEMS.map((item) => (
+          <SidebarLink key={item.key} item={item} active={nav === item.key} collapsed={!sidebarOpen} onClick={() => setNav(item.key)} />
+        ))}
+
+        {sidebarOpen && (
+          <div style={{ marginTop: 'auto', paddingTop: 16 }}>
+            <div style={{ fontSize: 10.5, color: dash.textFaint, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5, padding: '0 8px 8px' }}>Data Source</div>
+            {DATA_SOURCES.map((s) => (
+              <div key={s} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 8px', fontSize: 12.5, color: dash.textMuted }}>
+                <span style={{ width: 7, height: 7, borderRadius: '50%', background: dash.green }} /> {s}
+              </div>
+            ))}
+          </div>
+        )}
       </aside>
 
       {/* Main */}
@@ -225,7 +288,7 @@ function LeadershipShell(): React.ReactElement {
           </div>
         </header>
 
-        <main ref={printableRef as React.RefObject<HTMLElement>} style={{ flex: 1, padding: 24, display: 'flex', flexDirection: 'column', gap: 16, overflow: 'auto' }}>
+        <main ref={printableRef as React.RefObject<HTMLElement>} className="ld-scroll" style={{ flex: 1, padding: 24, display: 'flex', flexDirection: 'column', gap: 16, overflow: 'auto' }}>
           {!hasWorkbook ? (
             <div style={{ maxWidth: 640, margin: '40px auto', width: '100%' }}>
               <div style={{ background: dash.panelBg, border: `1px solid ${dash.border}`, borderRadius: 12, padding: 24 }}>

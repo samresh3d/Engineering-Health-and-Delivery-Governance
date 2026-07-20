@@ -16,8 +16,9 @@ import {
   type KpiStat,
   type ScoreCard,
 } from '../services/overview-metrics';
+import { computeOverviewInsights, type OverviewInsight, type InsightSeverity } from '../services/overview-insights';
+import { classify } from '../services/health-classifier';
 import type { EngineeringPillar, FilteredDataset } from '../model/types';
-import { generateInsights, type Insight } from '../services/insight-engine';
 import { lookupKpiInfo } from '../data/kpi-info';
 import InfoTooltip from './InfoTooltip';
 import DetailModal from './DetailModal';
@@ -28,9 +29,17 @@ import {
   LineChart,
   RadarChart,
   BarChart,
+  GroupedBarChart,
   Sparkline,
   type ChartSeries,
+  type GroupedBarSeries,
 } from './charts';
+
+const SEVERITY_STYLE: Record<InsightSeverity, { color: string }> = {
+  good: { color: dash.green },
+  warn: { color: dash.amber },
+  critical: { color: dash.red },
+};
 
 /* ----------------------------- formatting ------------------------------ */
 
@@ -43,6 +52,23 @@ function fmtCurrency(v: number | null): string {
   if (v >= 1_000_000) return `\u20b9${(v / 1_000_000).toFixed(1)}M`;
   if (v >= 1_000) return `\u20b9${(v / 1_000).toFixed(0)}K`;
   return `\u20b9${Math.round(v)}`;
+}
+function inferUnit(name: string, target: number | null): 'percent' | 'number' | 'currency' {
+  const n = name.toLowerCase();
+  if (n.includes('cost')) return 'currency';
+  if (
+    n.includes('commitment') ||
+    n.includes('coverage') ||
+    n.includes('compliance') ||
+    n.includes('utilization') ||
+    n.includes('success') ||
+    n.includes('availability') ||
+    n.includes('efficiency') ||
+    (target !== null && target > 1 && target <= 100)
+  ) {
+    return 'percent';
+  }
+  return 'number';
 }
 function fmtStatValue(stat: KpiStat): string {
   if (stat.value === null) return '—';
@@ -150,7 +176,23 @@ function ViewDetailsLink() {
   );
 }
 
-function PillarCard({ card, accent, icon, onOpen }: { card: ScoreCard; accent: string; icon: string; onOpen: () => void }) {
+function PillarCard({
+  card,
+  accent,
+  icon,
+  kpis = [],
+  onOpen,
+  onOpenKpi,
+  kpiStat,
+}: {
+  card: ScoreCard;
+  accent: string;
+  icon: string;
+  kpis?: string[];
+  onOpen: () => void;
+  onOpenKpi?: (kpi: string) => void;
+  kpiStat?: (kpi: string) => { text: string; color: string };
+}) {
   return (
     <ClickPanel onClick={onOpen}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -167,9 +209,55 @@ function PillarCard({ card, accent, icon, onOpen }: { card: ScoreCard; accent: s
       </div>
       <DeltaBadge delta={card.delta} suffix=" pts" prefixLabel="vs prev" />
       <div style={{ marginTop: 2 }}>
-        <Sparkline data={card.series} status={card.status} area height={40} />
+        <Sparkline data={card.series} status={card.status} area height={36} />
       </div>
-      <ViewDetailsLink />
+
+      {kpis.length > 0 && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginTop: 4, borderTop: `1px solid ${dash.borderSoft}`, paddingTop: 8 }}>
+          {kpis.map((kpi) => (
+            <button
+              key={kpi}
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onOpenKpi?.(kpi);
+              }}
+              title={kpi}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: 6,
+                textAlign: 'left',
+                background: 'transparent',
+                border: 'none',
+                borderRadius: 6,
+                padding: '3px 4px',
+                color: dash.textMuted,
+                fontSize: 11.5,
+                cursor: 'pointer',
+                width: '100%',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = dash.panelBgAlt;
+                e.currentTarget.style.color = dash.text;
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = 'transparent';
+                e.currentTarget.style.color = dash.textMuted;
+              }}
+            >
+              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1, minWidth: 0 }}>{kpi}</span>
+              {kpiStat && (
+                <span style={{ color: kpiStat(kpi).color, fontWeight: 700, flexShrink: 0, fontVariantNumeric: 'tabular-nums' }}>
+                  {kpiStat(kpi).text}
+                </span>
+              )}
+              <span style={{ color: dash.textFaint, flexShrink: 0 }}>→</span>
+            </button>
+          ))}
+        </div>
+      )}
     </ClickPanel>
   );
 }
@@ -181,8 +269,10 @@ const STATUS_TEXT: Record<KpiStat['status'], string> = {
   Unknown: 'No data',
 };
 
-function KpiStatCard({ stat, onOpen }: { stat: KpiStat; onOpen: () => void }) {
+function KpiStatCard({ stat, monthLabels, onOpen }: { stat: KpiStat; monthLabels: string[]; onOpen: () => void }) {
   const color = ragColorDark(stat.status);
+  const fmtTip = (v: number): string =>
+    stat.unit === 'currency' ? fmtCurrency(v) : stat.unit === 'percent' ? `${Math.round(v)}%` : fmtNumber(v);
   const dot = stat.status === 'Green' ? '✓' : stat.status === 'Red' ? '✕' : stat.status === 'Amber' ? '!' : '·';
   const targetText =
     stat.target === null
@@ -232,17 +322,18 @@ function KpiStatCard({ stat, onOpen }: { stat: KpiStat; onOpen: () => void }) {
         )}
       </div>
       <span style={{ fontSize: 11, color: dash.textFaint }}>{targetText}</span>
-      <Sparkline data={stat.series} status={stat.status} area height={28} />
+      <Sparkline data={stat.series} status={stat.status} area height={30} labels={monthLabels} formatValue={fmtTip} />
+      {monthLabels.length > 0 && (
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: -2 }}>
+          {monthLabels.map((m, i) => (
+            <span key={`${m}-${i}`} style={{ fontSize: 9.5, color: dash.textFaint }}>{m}</span>
+          ))}
+        </div>
+      )}
       <ViewDetailsLink />
     </ClickPanel>
   );
 }
-
-const INSIGHT_ICON: Record<Insight['type'], { icon: string; color: string }> = {
-  MoMChange: { icon: '📈', color: dash.delivery },
-  HighestForKpi: { icon: '🏆', color: dash.amber },
-  ConsistentlyExceeds: { icon: '✓', color: dash.green },
-};
 
 type Detail =
   | { kind: 'pillar'; pillar: EngineeringPillar; title: string }
@@ -250,12 +341,13 @@ type Detail =
   | null;
 
 export default function OverviewDashboard() {
-  const { filtered } = useLeadership();
+  const { filtered, selection } = useLeadership();
   const [detail, setDetail] = useState<Detail>(null);
+  const [showAllInsights, setShowAllInsights] = useState(false);
 
   const model = useMemo(() => (filtered ? computeOverview(filtered) : null), [filtered]);
   const insights = useMemo(
-    () => (filtered ? generateInsights(filtered, { momThresholdPercent: 10 }).slice(0, 5) : []),
+    () => (filtered ? computeOverviewInsights(filtered) : []),
     [filtered]
   );
 
@@ -274,11 +366,58 @@ export default function OverviewDashboard() {
     'Cost Efficiency': { accent: dash.cost, icon: '💰' },
   };
 
-  const perfSeries: ChartSeries[] = [
-    ...model.pillars.map((p) => ({ name: p.title, data: p.series })),
-    { name: 'AI', data: model.aiAdoption.series },
-  ];
+  const monthLabels = model.periods.map((p) => p.month);
   const perfCategories = model.periods.map((p) => `${p.month} '${String(p.year).slice(2)}`);
+
+  // Grouped bar: month-wise comparison of percentage-scale KPIs, highlighting
+  // the selected KPI(s) and muting the rest, with per-series target lines.
+  const perfPalette = [dash.delivery, dash.quality, dash.stability, dash.ai, dash.cost, dash.primary, '#EC4899', '#06B6D4'];
+  const selectedKpis = new Set(selection.kpis);
+  const perfSeries: GroupedBarSeries[] = model.kpiStrip
+    .filter((s) => s.unit === 'percent')
+    .map((s, i) => ({
+      name: s.kpi,
+      data: s.series,
+      color: perfPalette[i % perfPalette.length],
+      target: s.target,
+      unitSuffix: '%',
+      muted: selectedKpis.size > 0 && !selectedKpis.has(s.kpi),
+    }));
+
+  // KPIs belonging to each pillar, shown as clickable sub-stats on the tile.
+  const kpisForPillar = (pillar: EngineeringPillar): string[] =>
+    filtered.kpiDefinitions.filter((d) => d.pillar === pillar).map((d) => d.name);
+
+  // Per-KPI headline number: the mean of all present values in the (already
+  // month-filtered) dataset — i.e. the average across the selected range when
+  // "All" months are shown, or that month's value when a month is selected.
+  const defByName = new Map(filtered.kpiDefinitions.map((d) => [d.name, d]));
+  const kpiTileStat = (kpi: string): { text: string; color: string } => {
+    let sum = 0;
+    let n = 0;
+    for (const m of filtered.metrics) {
+      if (m.kpi === kpi && m.value !== null) {
+        sum += m.value;
+        n += 1;
+      }
+    }
+    const value = n === 0 ? null : sum / n;
+    const def = defByName.get(kpi);
+    const status =
+      def && value !== null
+        ? classify({ value, target: def.target, direction: def.direction, amberBand: def.amberBand })
+        : 'Unknown';
+    const unit = inferUnit(kpi, def?.target ?? null);
+    const text =
+      value === null
+        ? '—'
+        : unit === 'currency'
+          ? fmtCurrency(value)
+          : unit === 'percent'
+            ? `${Math.round(value)}%`
+            : fmtNumber(value);
+    return { text, color: ragColorDark(status) };
+  };
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -301,7 +440,10 @@ export default function OverviewDashboard() {
             card={p}
             accent={pillarMeta[p.title]?.accent ?? dash.primary}
             icon={pillarMeta[p.title]?.icon ?? '📊'}
+            kpis={kpisForPillar(p.key as EngineeringPillar)}
+            kpiStat={kpiTileStat}
             onOpen={() => setDetail({ kind: 'pillar', pillar: p.key as EngineeringPillar, title: p.title })}
+            onOpenKpi={(kpi) => setDetail({ kind: 'kpi', kpi })}
           />
         ))}
         <PillarCard
@@ -331,8 +473,17 @@ export default function OverviewDashboard() {
           </div>
         </Panel>
 
-        <Panel title="KPI Performance Over Time (All Teams)">
-          <LineChart categories={perfCategories} series={perfSeries} height={240} />
+        <Panel
+          title="KPI Performance Over Time (All Teams)"
+          right={<span style={{ fontSize: 11, color: dash.textFaint }}>Month-wise · % KPIs{selectedKpis.size > 0 ? ' · filtered' : ''}</span>}
+        >
+          {perfSeries.length === 0 ? (
+            <div style={{ padding: 24, textAlign: 'center', color: dash.textFaint, fontSize: 13 }}>
+              No percentage KPIs available for comparison.
+            </div>
+          ) : (
+            <GroupedBarChart categories={perfCategories} series={perfSeries} height={240} />
+          )}
         </Panel>
 
         <Panel title="Team Ranking">
@@ -357,12 +508,12 @@ export default function OverviewDashboard() {
       {/* Row 3: KPI stat strip */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
         {model.kpiStrip.map((s) => (
-          <KpiStatCard key={s.kpi} stat={s} onOpen={() => setDetail({ kind: 'kpi', kpi: s.kpi })} />
+          <KpiStatCard key={s.kpi} stat={s} monthLabels={monthLabels} onOpen={() => setDetail({ kind: 'kpi', kpi: s.kpi })} />
         ))}
       </div>
 
-      {/* Row 4: heatmap + radar + insights + cost trend */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1.3fr 1fr 1fr 1fr', gap: 16 }}>
+      {/* Row 4: heatmap + radar + cost trend */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr 1fr', gap: 16 }}>
         <Panel title={`KPI Health Heatmap${model.latestPeriod ? ` (${model.latestPeriod.month} ${model.latestPeriod.year})` : ''}`}>
           <HeatmapGrid kpis={model.heatmap.kpis} teams={model.heatmap.teams} status={model.heatmap.status} />
         </Panel>
@@ -378,21 +529,6 @@ export default function OverviewDashboard() {
           />
         </Panel>
 
-        <Panel title="Key Insights">
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            {insights.length === 0 && <span style={{ color: dash.textFaint, fontSize: 13 }}>No notable insights for the current selection.</span>}
-            {insights.map((ins, i) => {
-              const meta = INSIGHT_ICON[ins.type];
-              return (
-                <div key={i} style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
-                  <span style={{ color: meta.color, fontSize: 14 }}>{meta.icon}</span>
-                  <span style={{ fontSize: 12.5, color: dash.text, lineHeight: 1.4 }}>{ins.message}</span>
-                </div>
-              );
-            })}
-          </div>
-        </Panel>
-
         <Panel title="Cost Trend (All Teams)">
           <BarChart
             categories={model.costTrend.labels}
@@ -404,6 +540,32 @@ export default function OverviewDashboard() {
           </div>
         </Panel>
       </div>
+
+      {/* Row 5: Key Insights (full width, laid out horizontally) */}
+      <Panel
+        title="Key Insights"
+        right={
+          insights.length > 0 ? (
+            <button
+              type="button"
+              onClick={() => setShowAllInsights(true)}
+              style={{ background: 'transparent', border: 'none', color: dash.primary, fontSize: 12.5, fontWeight: 600, cursor: 'pointer' }}
+            >
+              View All Insights →
+            </button>
+          ) : undefined
+        }
+      >
+        {insights.length === 0 ? (
+          <span style={{ color: dash.textFaint, fontSize: 13 }}>No notable insights for the current selection.</span>
+        ) : (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 12 }}>
+            {insights.slice(0, 4).map((ins, i) => (
+              <InsightRow key={i} insight={ins} />
+            ))}
+          </div>
+        )}
+      </Panel>
 
       {detail && detail.kind === 'pillar' && (
         <DetailModal
@@ -423,6 +585,62 @@ export default function OverviewDashboard() {
           <KpiDetailContent data={filtered} kpi={detail.kpi} />
         </DetailModal>
       )}
+      {showAllInsights && (
+        <DetailModal
+          title="Key Insights"
+          subtitle={model.latestPeriod ? `As of ${model.latestPeriod.month} ${model.latestPeriod.year}` : undefined}
+          onClose={() => setShowAllInsights(false)}
+        >
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {insights.length === 0 ? (
+              <span style={{ color: dash.textFaint, fontSize: 13 }}>No insights for the current selection.</span>
+            ) : (
+              insights.map((ins, i) => <InsightRow key={i} insight={ins} />)
+            )}
+          </div>
+        </DetailModal>
+      )}
+    </div>
+  );
+}
+
+/** A single Key Insights row: colored severity circle + title + recommendation. */
+function InsightRow({ insight }: { insight: OverviewInsight }) {
+  const color = SEVERITY_STYLE[insight.severity].color;
+  return (
+    <div
+      style={{
+        display: 'flex',
+        gap: 12,
+        alignItems: 'flex-start',
+        background: dash.panelBgAlt,
+        border: `1px solid ${dash.borderSoft}`,
+        borderRadius: 10,
+        padding: '10px 12px',
+      }}
+    >
+      <span
+        aria-hidden
+        style={{
+          width: 26,
+          height: 26,
+          borderRadius: '50%',
+          background: color,
+          color: '#0B1220',
+          fontSize: 14,
+          fontWeight: 800,
+          display: 'inline-flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          flexShrink: 0,
+        }}
+      >
+        {insight.icon}
+      </span>
+      <div style={{ minWidth: 0 }}>
+        <div style={{ fontSize: 13, fontWeight: 700, color: dash.textStrong, lineHeight: 1.3 }}>{insight.title}</div>
+        <div style={{ fontSize: 12, color: dash.textMuted, lineHeight: 1.35, marginTop: 2 }}>{insight.detail}</div>
+      </div>
     </div>
   );
 }
@@ -583,7 +801,7 @@ function HeatmapGrid({
   status: ('Green' | 'Amber' | 'Red' | 'Unknown')[][];
 }) {
   return (
-    <div style={{ overflow: 'auto', maxHeight: 320 }}>
+    <div className="ld-scroll" style={{ overflow: 'auto', maxHeight: 320 }}>
       <table style={{ borderCollapse: 'collapse', width: '100%', fontSize: 11 }}>
         <thead>
           <tr>
