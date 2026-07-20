@@ -1,3 +1,4 @@
+import { lazy, Suspense } from 'react';
 import { Routes, Route, Link, Navigate, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { clearAuth, getStoredUser } from './auth';
@@ -17,6 +18,13 @@ import FunctionManager from './pages/admin/FunctionManager';
 import TeamManager from './pages/admin/TeamManager';
 import EMFunctionAssignment from './pages/admin/EMFunctionAssignment';
 import logo from './logo.svg';
+
+/**
+ * Standalone, backend-free Leadership Dashboard module (Req 14.1-14.4).
+ * Lazy-loaded so it stays fully isolated from the existing dashboard bundle;
+ * './leadership' resolves to client/src/leadership/index.tsx (default export).
+ */
+const LeadershipModule = lazy(() => import('./leadership'));
 
 /**
  * Helper to determine which nav links to show based on user role.
@@ -204,6 +212,19 @@ export default function App() {
         <Route path="em-assignment" element={<EMFunctionAssignment />} />
         <Route path="settings" element={<AdminSettings />} />
       </Route>
+      {/*
+        Isolated Leadership Dashboard module (Req 14.1-14.5). Intentionally kept
+        outside ProtectedRoute/AppLayout so the module renders standalone as a
+        separate, backend-free module — no coupling to existing routes.
+      */}
+      <Route
+        path="/leadership/*"
+        element={
+          <Suspense fallback={<div>Loading Leadership Dashboard…</div>}>
+            <LeadershipModule />
+          </Suspense>
+        }
+      />
     </Routes>
   );
 }
