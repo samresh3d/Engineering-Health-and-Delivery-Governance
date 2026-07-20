@@ -327,6 +327,9 @@ export function parseMatrix(
 
   const kpiPillar = new Map<string, EngineeringPillar | null>();
   const kpiTargetText = new Map<string, string>();
+  // Descriptor metadata retained per-KPI (first-seen row) for the pivot view.
+  const kpiHowToMeasure = new Map<string, string | null>();
+  const kpiSource = new Map<string, string | null>();
 
   let currentPillar: EngineeringPillar | null = null;
 
@@ -353,6 +356,15 @@ export function parseMatrix(
       if (fixed.target >= 0) {
         kpiTargetText.set(kpiName, rowTargetText);
       }
+      // Capture descriptor metadata from the first-seen row of this KPI.
+      const howToMeasure =
+        fixed.howToMeasure >= 0
+          ? String(row[fixed.howToMeasure] ?? '').trim()
+          : '';
+      kpiHowToMeasure.set(kpiName, howToMeasure !== '' ? howToMeasure : null);
+      const sourceText =
+        fixed.source >= 0 ? String(row[fixed.source] ?? '').trim() : '';
+      kpiSource.set(kpiName, sourceText !== '' ? sourceText : null);
     }
 
     // Percentage KPIs may store values as 0–1 fractions; normalize those to a
@@ -377,9 +389,19 @@ export function parseMatrix(
     const fallback = lookupKpiPillar(name);
     const pillar = kpiPillar.get(name) ?? fallback.pillar;
     const direction: Direction = fallback.direction;
-    const target = parseTargetText(kpiTargetText.get(name));
+    const rawTargetText = kpiTargetText.get(name);
+    const target = parseTargetText(rawTargetText);
     const amberBand: AmberBand | null = null;
-    return { name, pillar, direction, target, amberBand };
+    return {
+      name,
+      pillar,
+      direction,
+      target,
+      amberBand,
+      howToMeasure: kpiHowToMeasure.get(name) ?? null,
+      targetText: rawTargetText && rawTargetText !== '' ? rawTargetText : null,
+      source: kpiSource.get(name) ?? null,
+    };
   });
 
   const ENGINEERING_PILLARS: EngineeringPillar[] = [

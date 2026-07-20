@@ -14,6 +14,13 @@ import type {
   FilteredDataset,
 } from '../model/types';
 import type { ParseError } from '../services/excel-parser';
+import type {
+  AuditTrail,
+  Version,
+  GridFilterSelection,
+} from '../model/editing-types';
+import type { EditHistoryState } from '../services/edit-history';
+import type { ImportMode } from '../services/import-service';
 
 /** The status of the module with respect to workbook parsing. */
 export type LeadershipStatus = 'idle' | 'parsing' | 'ready' | 'error';
@@ -44,8 +51,58 @@ export interface LeadershipActions {
   toggleTheme(): void;
 }
 
-/** The full context value: state + actions. */
-export type LeadershipContextValue = LeadershipState & LeadershipActions;
+/**
+ * Editing state added on top of the base {@link LeadershipState}. These fields
+ * back the data-management features (audit trail, versioning, approvals,
+ * undo/redo history, save errors, and the grid filter selection).
+ */
+export interface LeadershipEditingState {
+  auditTrail: AuditTrail;
+  versions: Version[];
+  currentUser: string | null;
+  approvalEnabled: boolean;
+  history: EditHistoryState; // undo/redo stacks
+  saveError: string | null;
+  gridFilter: GridFilterSelection; // Month/Team/Pillar/KPI/Status/Updated By
+  /** True when edits have been made since the last saved version checkpoint. */
+  hasUnsavedChanges: boolean;
+}
+
+/** Actions that drive the editing/data-management state. */
+export interface LeadershipEditingActions {
+  commitEdit(
+    rowId: string,
+    field: 'target' | 'actual',
+    raw: string,
+    comments?: string
+  ): void;
+  bulkEdit(rowIds: string[], field: 'target' | 'actual', raw: string): void;
+  pasteCells(
+    anchorRowId: string,
+    field: 'target' | 'actual',
+    matrix: string[][]
+  ): void;
+  deleteRows(rowIds: string[]): void;
+  undo(): void;
+  redo(): void;
+  setCurrentUser(name: string): void;
+  setApprovalEnabled(enabled: boolean): void;
+  submitForApproval(rowId: string): void;
+  approve(rowId: string): void;
+  reject(rowId: string): void;
+  setGridFilter(patch: Partial<GridFilterSelection>): void;
+  clearGridFilter(): void;
+  importWorkbook(buffer: ArrayBuffer, mode: ImportMode): void;
+  restoreVersion(versionId: string): void;
+  /** Create a Version checkpoint (snapshot) of the current working set. */
+  saveVersion(cycle?: string): void;
+}
+
+/** The full context value: state + actions + editing state + editing actions. */
+export type LeadershipContextValue = LeadershipState &
+  LeadershipActions &
+  LeadershipEditingState &
+  LeadershipEditingActions;
 
 /**
  * The context is `null` until a `LeadershipProvider` supplies a value. The

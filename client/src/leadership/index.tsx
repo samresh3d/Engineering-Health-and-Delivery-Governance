@@ -19,11 +19,12 @@ import TeamPerformanceView from './components/TeamPerformanceView';
 import TrendsView from './components/TrendsView';
 import KpiDrillDownView from './components/KpiDrillDownView';
 import InsightsPanel from './components/InsightsPanel';
+import DataManagementView from './components/DataManagementView';
 import ExportControls from './components/ExportControls';
 import type { FilterSelection } from './model/types';
 import { dash } from './theme';
 
-type NavKey = 'overview' | 'team' | 'deepdive' | 'trends' | 'insights';
+type NavKey = 'overview' | 'team' | 'deepdive' | 'trends' | 'insights' | 'data';
 
 const NAV_ITEMS: { key: NavKey; label: string; icon: string }[] = [
   { key: 'overview', label: 'Overview', icon: '▤' },
@@ -31,6 +32,7 @@ const NAV_ITEMS: { key: NavKey; label: string; icon: string }[] = [
   { key: 'deepdive', label: 'KPI Deep Dive', icon: '🔎' },
   { key: 'trends', label: 'Trends & Insights', icon: '📈' },
   { key: 'insights', label: 'Insights', icon: '💡' },
+  { key: 'data', label: 'Data Management', icon: '🗃' },
 ];
 
 const DATA_SOURCES = ['Jira', 'Sustain Report', 'Dynatrace', 'AWS Cost'];
@@ -191,6 +193,10 @@ function LeadershipShell(): React.ReactElement {
         return <LegacyView><TrendsView /></LegacyView>;
       case 'insights':
         return <LegacyView><InsightsPanel /></LegacyView>;
+      case 'data':
+        // DataManagementView is a full page shell with its own import controls
+        // and empty state, so it is rendered directly (not wrapped in LegacyView).
+        return <DataManagementView />;
       default:
         return <OverviewDashboard />;
     }
@@ -289,7 +295,11 @@ function LeadershipShell(): React.ReactElement {
         </header>
 
         <main ref={printableRef as React.RefObject<HTMLElement>} className="ld-scroll" style={{ flex: 1, padding: 24, display: 'flex', flexDirection: 'column', gap: 16, overflow: 'auto' }}>
-          {!hasWorkbook ? (
+          {nav === 'data' ? (
+            // The Data Management view hosts its own import controls and empty
+            // state, so it stays reachable even before a workbook is loaded.
+            <DataManagementView />
+          ) : !hasWorkbook ? (
             <div style={{ maxWidth: 640, margin: '40px auto', width: '100%' }}>
               <div style={{ background: dash.panelBg, border: `1px solid ${dash.border}`, borderRadius: 12, padding: 24 }}>
                 <h2 style={{ marginTop: 0, color: dash.textStrong }}>Upload your KPI workbook</h2>

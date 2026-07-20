@@ -47,6 +47,17 @@ export interface KpiDefinition {
   target: number | null;
   /** Present only when the sheet provides amber thresholds (Req 5.6). */
   amberBand: AmberBand | null;
+  /**
+   * Optional descriptor metadata retained from a matrix-layout workbook so the
+   * Excel-style pivot view can reproduce the source layout. Additive and
+   * optional — absent for normalized workbooks and ignored by the exporter.
+   */
+  /** Measurement description text, e.g. "(SP done / committed) x 100". */
+  howToMeasure?: string | null;
+  /** Original target text, e.g. ">90%", "<4 hours", "Zero Sev-1/Sev-2". */
+  targetText?: string | null;
+  /** Data source label, e.g. "Jira", "Sustain Report", "Dynatrace". */
+  source?: string | null;
 }
 
 /** One measured cell: a KPI value for a team in a period. */
