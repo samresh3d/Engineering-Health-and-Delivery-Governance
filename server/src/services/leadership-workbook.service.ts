@@ -48,6 +48,40 @@ function workbookFile(): string {
 }
 
 /**
+ * Resolve the path to the committed seed workbook that ships with the deploy.
+ * Overridable via `LEADERSHIP_SEED_FILE`; defaults to `server/seed/leadership.xlsx`
+ * (resolved relative to this module so it works from both `src` and `dist`).
+ */
+function seedFile(): string {
+  return (
+    process.env.LEADERSHIP_SEED_FILE ??
+    path.resolve(__dirname, '../../seed/leadership.xlsx')
+  );
+}
+
+/**
+ * Seed the upload directory with the committed default workbook when no
+ * workbook is present yet. This guarantees the dashboard has data on a fresh
+ * deploy or after an ephemeral-filesystem restart (e.g. Render without a
+ * persistent disk). Never throws; a missing seed or copy failure is a no-op.
+ *
+ * @returns `true` when a seed copy was performed, `false` otherwise.
+ */
+export function seedDefaultWorkbook(): boolean {
+  try {
+    if (hasWorkbook()) return false; // a workbook already exists — leave it be
+    const seed = seedFile();
+    if (!fs.existsSync(seed)) return false; // no seed shipped
+    const dir = uploadDir();
+    fs.mkdirSync(dir, { recursive: true });
+    fs.copyFileSync(seed, workbookFile());
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Public getter for the workbook path. Recomputes from the environment on each
  * call so tests that set `LEADERSHIP_UPLOAD_DIR` observe the change.
  */

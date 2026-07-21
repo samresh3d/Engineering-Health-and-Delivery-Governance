@@ -6,6 +6,9 @@ dist/
 *.db-shm
 *.db-wal
 *.xlsx
+# Keep the committed seed workbook so a default leadership.xlsx ships with the
+# deploy and is seeded into the upload dir on server startup.
+!server/seed/leadership.xlsx
 server/data/
 .env
 .env.local
