@@ -67,7 +67,8 @@ function downloadCsv(csv: string, filename: string = CSV_FILENAME): void {
 }
 
 export default function ImportExportControls() {
-  const { model, error, importWorkbook } = useLeadership();
+  const { model, error, importWorkbook, uploadWorkbookToServer } =
+    useLeadership();
   const inputRef = useRef<HTMLInputElement>(null);
   const [mode, setMode] = useState<ImportMode>('replace');
 
@@ -81,9 +82,17 @@ export default function ImportExportControls() {
       event.target.value = '';
       if (!file) return;
       const buffer = await file.arrayBuffer();
-      importWorkbook(buffer, mode);
+      if (mode === 'replace') {
+        // Replace persists to the server (the single-source-of-truth file) and
+        // reloads locally on success.
+        uploadWorkbookToServer(buffer);
+      } else {
+        // Merge is a client-only operation on the in-memory model; it does NOT
+        // replace the server source-of-truth file.
+        importWorkbook(buffer, 'merge');
+      }
     },
-    [importWorkbook, mode]
+    [importWorkbook, uploadWorkbookToServer, mode]
   );
 
   const openPicker = useCallback(() => {

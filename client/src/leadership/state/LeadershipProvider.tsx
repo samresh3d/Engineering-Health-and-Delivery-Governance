@@ -72,6 +72,10 @@ import {
   type PersistedState,
 } from '../services/persistence-service';
 import {
+  fetchServerWorkbook,
+  uploadServerWorkbook,
+} from '../services/workbook-store';
+import {
   LeadershipContext,
   type LeadershipContextValue,
 } from './LeadershipContext';
@@ -787,6 +791,36 @@ export function LeadershipProvider({ children }: LeadershipProviderProps) {
     }
   }, []);
 
+  /**
+   * Persist a workbook to the server (the single source of truth) and, on
+   * success, load it locally so the view reflects it immediately. On failure
+   * surface the error through the existing parse-error channel without
+   * clobbering the current model. Fire-and-forget: never throws.
+   */
+  const uploadWorkbookToServer = useCallback((buffer: ArrayBuffer) => {
+    uploadServerWorkbook(buffer)
+      .then((result) => {
+        if (result.ok) {
+          // Re-load locally (parse + set model) so the UI updates now.
+          uploadWorkbook(buffer);
+        } else {
+          dispatch({
+            type: 'PARSE_ERROR',
+            error: { code: 'INVALID_WORKBOOK', message: result.error },
+          });
+        }
+      })
+      .catch(() => {
+        dispatch({
+          type: 'PARSE_ERROR',
+          error: {
+            code: 'INVALID_WORKBOOK',
+            message: 'Failed to upload the workbook to the server.',
+          },
+        });
+      });
+  }, [uploadWorkbook]);
+
   const updateSelection = useCallback((patch: Partial<FilterSelection>) => {
     dispatch({ type: 'UPDATE_SELECTION', patch });
   }, []);
@@ -931,15 +965,38 @@ export function LeadershipProvider({ children }: LeadershipProviderProps) {
   // Attempt to load a previously saved working set exactly once. Guarded so a
   // storage failure never throws during mount.
   useEffect(() => {
-    let loaded: PersistedState | null = null;
-    try {
-      loaded = persistenceService.load();
-    } catch {
-      loaded = null;
-    }
-    if (loaded) {
-      dispatch({ type: 'RESTORE', payload: loaded });
-    }
+    let cancelled = false;
+    (async () => {
+      // Prefer the server workbook (single source of truth). fetchServerWorkbook
+      // is crash-proof and returns null on 404 / any error (incl. absent fetch).
+      let serverBuffer: ArrayBuffer | null = null;
+      try {
+        serverBuffer = await fetchServerWorkbook();
+      } catch {
+        serverBuffer = null;
+      }
+      if (cancelled) return;
+      if (serverBuffer !== null) {
+        // Parse + set the model via the existing upload flow.
+        uploadWorkbook(serverBuffer);
+        return;
+      }
+      // No server workbook → fall back to the locally saved working set.
+      let loaded: PersistedState | null = null;
+      try {
+        loaded = persistenceService.load();
+      } catch {
+        loaded = null;
+      }
+      if (!cancelled && loaded) {
+        dispatch({ type: 'RESTORE', payload: loaded });
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // Run once on mount; uploadWorkbook is a stable useCallback.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // --- Auto-save -----------------------------------------------------------
@@ -982,6 +1039,7 @@ export function LeadershipProvider({ children }: LeadershipProviderProps) {
       hasUnsavedChanges: state.hasUnsavedChanges,
       // Base actions.
       uploadWorkbook,
+      uploadWorkbookToServer,
       updateSelection,
       clearFilters,
       setSearch,
@@ -1007,6 +1065,7 @@ export function LeadershipProvider({ children }: LeadershipProviderProps) {
     [
       state,
       uploadWorkbook,
+      uploadWorkbookToServer,
       updateSelection,
       clearFilters,
       setSearch,

@@ -1,15 +1,18 @@
 import axios from 'axios';
 import { getStoredToken, clearAuth } from '../auth';
+import { API_BASE_URL } from '../config';
 import type { KpiResult, RagStatus, ConfirmUploadRequest, ConfirmUploadResponse, DeclineUploadResponse } from '../types';
 
 /**
  * Pre-configured Axios instance for API communication.
- * - Base URL points to the local Express server
+ * - Base URL is resolved via `config.ts` (`API_BASE_URL`): the local Express
+ *   server in development, and same-origin (relative) URLs when hosted, with a
+ *   safety net that ignores a localhost base on a deployed page.
  * - Request interceptor injects JWT token from stored auth
  * - Response interceptor handles 401 by clearing auth and redirecting to login
  */
 const apiClient = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || '',
+  baseURL: API_BASE_URL,
   headers: {
     'Content-Type': 'application/json',
   },

@@ -35,7 +35,7 @@ const ACCEPTED_TYPES_LABEL = '.xlsx, .xls';
 const ACCEPT_ATTR = '.xlsx,.xls';
 
 export default function UploadZone() {
-  const { uploadWorkbook, status, error } = useLeadership();
+  const { uploadWorkbookToServer, status, error } = useLeadership();
   const inputRef = useRef<HTMLInputElement>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [rejectMessage, setRejectMessage] = useState<string | null>(null);
@@ -66,12 +66,15 @@ export default function UploadZone() {
         return;
       }
 
-      // Accepted: clear any prior reject message, read the file, and upload.
+      // Accepted: clear any prior reject message, read the file, and persist to
+      // the server (single source of truth). On success it re-loads locally, so
+      // the parsing/ready/error UX still transitions as before; on server
+      // failure the error surfaces via the provider's error channel.
       setRejectMessage(null);
       const buffer = await file.arrayBuffer();
-      uploadWorkbook(buffer);
+      uploadWorkbookToServer(buffer);
     },
-    [uploadWorkbook]
+    [uploadWorkbookToServer]
   );
 
   const onInputChange = useCallback(

@@ -96,6 +96,11 @@ export interface LeadershipEditingActions {
   restoreVersion(versionId: string): void;
   /** Create a Version checkpoint (snapshot) of the current working set. */
   saveVersion(cycle?: string): void;
+  /**
+   * Persist a workbook to the server (single source of truth) and reload it
+   * locally on success. Errors surface via the parse-error channel.
+   */
+  uploadWorkbookToServer(buffer: ArrayBuffer): void;
 }
 
 /** The full context value: state + actions + editing state + editing actions. */

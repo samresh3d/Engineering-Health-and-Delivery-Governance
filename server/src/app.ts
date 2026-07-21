@@ -19,6 +19,7 @@ import governanceRoutes from './routes/governance.routes';
 import functionRoutes from './routes/function.routes';
 import teamRoutes from './routes/team.routes';
 import emTeamsRoutes from './routes/em-teams.routes';
+import leadershipRoutes from './routes/leadership.routes';
 
 const app = express();
 
@@ -31,6 +32,12 @@ app.use(express.json());
 // Serve client static files BEFORE any auth (no token needed for frontend assets)
 const clientDistPath = path.join(__dirname, '../../client/dist');
 app.use(express.static(clientDistPath));
+
+// Leadership workbook file-store: intentionally PUBLIC and lightweight.
+// This backs an internal single-file dashboard whose Excel workbook is the only
+// data source, matching the unauthenticated static assets and /leadership client
+// module. Registered BEFORE the RBAC middleware so it stays unauthenticated.
+app.use('/api/leadership', leadershipRoutes);
 
 // RBAC middleware applied globally (skips non-API routes internally)
 app.use(rbacMiddleware);
